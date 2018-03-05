@@ -1,0 +1,7 @@
+[package]
+name = "typeflow"
+version = "0.1.0"
+authors = ["Geordon Worley <vadixidav@gmail.com>"]
+
+[dependencies]
+nom = "4.0.0-beta1"
