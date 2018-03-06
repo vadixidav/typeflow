@@ -31,7 +31,7 @@
 //! - `a c` can be turned into `+(b c) -(c)`
 //! - `+(b c) -(c)` can be turned into `+(b)`
 //!     (builtin `n == n(+(+(n m) -(m)))` if `n = i` and `m = i`)
-//! - `+(b)` can be turned into `b` (builtin `n == -(n)` if `n = i`)
+//! - `+(b)` can be turned into `b` (builtin `n == +(n)` if `n = i`)
 //! As can be seen, lots of different things can be deduced from just `a c`.
 //! However, in this case, having `b c` allows the deduction of almost nothing
 //! aside from unary transformations of itself like `-(b) c`, `b -(c)` or
@@ -84,12 +84,19 @@ struct Cast {
     expression: Expression,
 }
 
-struct Equation {}
+struct Equation {
+    typegroup: TypeGroup,
+    expression: Expression,
+}
 
-struct Program {}
+struct State {
+    types: TypeGroup,
+}
+
+named!(parse_expression<&str, Cast>, unimplemented!());
 
 /// Attempts to parse a cast inside of a line.
-// named!(parse_cast<&str, Cast>,);
+//named!(parse_cast<&str, Cast>, ws!(fold_many1!(ws!(take_till1_s!(|c| c.is_whitespace(), )))));
 
 /// Attempts to parse a line into an explicit conversion.
 //named!(parse_conversion<&str, Conversion>);
