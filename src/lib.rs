@@ -50,10 +50,10 @@ struct Explicit {
 
 /// An Environment contains all of the definitions and instances available to a given explicit conversion.
 #[derive(Clone, Debug)]
-struct Environment {
+struct Environment<'a> {
     definitions: Vec<Definiton>,
     instances: Vec<Instance>,
     /// Parent instances are drawn from after this environment.
     /// Parent definitions are tried after this environment's definitions, but are tried for all instances.
-    parents: Rc<Environment>,
+    parents: Vec<&'a Environment<'a>>,
 }
