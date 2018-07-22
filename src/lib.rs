@@ -2,6 +2,7 @@
 extern crate nom;
 
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 type Type = String;
 
@@ -45,4 +46,14 @@ enum Parameter {
 #[derive(Clone, Debug)]
 struct Explicit {
     target: Type,
+}
+
+/// An Environment contains all of the definitions and instances available to a given explicit conversion.
+#[derive(Clone, Debug)]
+struct Environment {
+    definitions: Vec<Definiton>,
+    instances: Vec<Instance>,
+    /// Parent instances are drawn from after this environment.
+    /// Parent definitions are tried after this environment's definitions, but are tried for all instances.
+    parents: Rc<Environment>,
 }
