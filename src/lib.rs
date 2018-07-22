@@ -4,8 +4,6 @@ extern crate nom;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-type Type = String;
-
 #[derive(Clone, Debug)]
 enum Instance {
     I64(i64),
@@ -18,13 +16,38 @@ enum Instance {
     U8(u8),
     F64(f64),
     F32(f32),
-    Compound { ty: Type, contained: Vec<Instance> },
+    Compound(Rc<Compound>),
+}
+
+#[derive(Clone, Debug)]
+struct Compound {
+    ty: String,
+    contained: Vec<Instance>,
+}
+
+impl Instance {
+    fn is_type(&self, ty: &str) -> bool {
+        use Instance::*;
+        ty == match self {
+            I64(_) => "i64",
+            U64(_) => "u64",
+            I32(_) => "i32",
+            U32(_) => "u32",
+            I16(_) => "i16",
+            U16(_) => "u16",
+            I8(_) => "i8",
+            U8(_) => "u8",
+            F64(_) => "f64",
+            F32(_) => "f32",
+            Compound(c) => &c.ty,
+        }
+    }
 }
 
 /// A definition is `ltype = expr`.
 #[derive(Clone, Debug)]
 struct Definiton {
-    ltype: Type,
+    ltype: String,
     expr: Expression,
 }
 
@@ -39,13 +62,14 @@ struct Expression {
 #[derive(Clone, Debug)]
 enum Parameter {
     Explicit(Explicit),
-    Implicit(Type),
+    Implicit(String),
 }
 
 /// Defines an explicit conversion.
 #[derive(Clone, Debug)]
 struct Explicit {
-    target: Type,
+    target: String,
+    expr: Expression,
 }
 
 /// An Environment contains all of the definitions and instances available to a given explicit conversion.
@@ -56,4 +80,18 @@ struct Environment<'a> {
     /// Parent instances are drawn from after this environment.
     /// Parent definitions are tried after this environment's definitions, but are tried for all instances.
     parents: Vec<&'a Environment<'a>>,
+}
+
+impl<'a> Environment<'a> {
+    pub fn resolve_param(&self, param: Parameter) -> Option<Instance> {
+        match param {
+            Parameter::Explicit(_ep) => unimplemented!(),
+            Parameter::Implicit(ty) => self
+                .instances
+                .iter()
+                .chain(self.parents.iter().flat_map(|p| p.instances.iter()))
+                .find(|ins| ins.is_type(&ty))
+                .cloned(),
+        }
+    }
 }
