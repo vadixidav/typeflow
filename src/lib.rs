@@ -1,11 +1,13 @@
 #[macro_use]
 extern crate nom;
 extern crate boolinator;
+extern crate itertools;
 
 mod primitive;
-use primitive::Primitive;
+use primitive::*;
 
 use boolinator::Boolinator;
+use itertools::Itertools;
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
@@ -36,6 +38,38 @@ impl Instance {
                 None
             }
         })
+    }
+
+    /// Try and implicitly convert this `Instance` to a primitive.
+    fn try_primitive(&self, env: &Environment) -> Option<Primitive> {
+        if let Instance::Primitive(p) = self {
+            Some(p.clone())
+        } else {
+            let local_env = Environment {
+                definitions: vec![],
+                instances: vec![self.clone()],
+                parents: vec![env],
+            };
+
+            prim_types()
+                .filter_map(|ty| local_env.implicit(ty))
+                .map(|ins| ins.must_be_primitive())
+                .next()
+        }
+    }
+
+    fn must_be_primitive(&self) -> Primitive {
+        match self {
+            Instance::Primitive(p) => p.clone(),
+            _ => unreachable!(),
+        }
+    }
+
+    fn must_be_compound(&self) -> Rc<Compound> {
+        match self {
+            Instance::Compound(c) => c.clone(),
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -163,14 +197,40 @@ impl<'a> Environment<'a> {
     }
 
     fn implicit(&self, ty: &str) -> Option<Instance> {
-        self.find_type(ty).or_else(|| {
-            self.iter_definitons()
-                .filter_map(|d| d.implicit(ty, self))
-                .next()
-        })
+        self.find_type(ty)
+            .or_else(|| {
+                self.iter_definitons()
+                    .filter_map(|d| d.implicit(ty, self))
+                    .next()
+            })
+            .or_else(|| self.try_builtin(ty))
     }
 
     fn find_type(&self, ty: &str) -> Option<Instance> {
         self.iter_instances().find(|ins| ins.is_type(&ty)).cloned()
     }
+
+    /// Try to use built-in implicit conversions.
+    fn try_builtin(&self, ty: &str) -> Option<Instance> {
+        if is_prim_type(ty) {
+            self.implicit("+")
+                .map(|ins| ins.must_be_compound())
+                .and_then(|c| {
+                    ordered_types()
+                        .map(|ty| c.extract(&ty))
+                        .while_some()
+                        .map(|ins| ins.try_primitive(self))
+                        .fold1(|a, b| a.and_then(|a| b.map(|b| a + b)))
+                        .and_then(|a| a)
+                        .and_then(|p| p.implicit(ty))
+                        .map(Instance::Primitive)
+                })
+        } else {
+            None
+        }
+    }
+}
+
+fn ordered_types() -> impl Iterator<Item = String> {
+    (0..).map(|n| format!("@{}", n))
 }

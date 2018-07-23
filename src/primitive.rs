@@ -19,6 +19,42 @@ impl Primitive {
             U(_) => "u",
         }
     }
+
+    pub fn implicit(&self, ty: &str) -> Option<Primitive> {
+        use Primitive::*;
+        match ty {
+            "str" => Some(match self {
+                String(s) => String(s.clone()),
+                F(f) => String(Cow::Owned(f.to_string())),
+                I(i) => String(Cow::Owned(i.to_string())),
+                U(u) => String(Cow::Owned(u.to_string())),
+            }),
+            "f" => match self {
+                F(f) => Some(F(*f)),
+                I(i) => Some(F(*i as f64)),
+                U(u) => Some(F(*u as f64)),
+                _ => None,
+            },
+            "i" => match self {
+                I(i) => Some(I(*i)),
+                U(u) => Some(I(*u as i64)),
+                _ => None,
+            },
+            "u" => match self {
+                U(u) => Some(U(*u)),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+}
+
+pub fn prim_types() -> impl Iterator<Item = &'static str> {
+    ["str", "f", "i", "u"].into_iter().cloned()
+}
+
+pub fn is_prim_type(ty: &str) -> bool {
+    prim_types().find(|&s| s == ty).is_some()
 }
 
 impl Add for Primitive {
