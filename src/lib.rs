@@ -1,17 +1,15 @@
-#[macro_use]
-extern crate nom;
 extern crate boolinator;
 extern crate itertools;
 
 mod primitive;
-use primitive::*;
+pub use primitive::*;
 
 use boolinator::Boolinator;
 use itertools::Itertools;
 use std::rc::Rc;
 
-#[derive(Clone, Debug)]
-enum Instance {
+#[derive(Clone, Debug, PartialEq)]
+pub enum Instance {
     Primitive(Primitive),
     Compound(Rc<Compound>),
 }
@@ -73,10 +71,10 @@ impl Instance {
     }
 }
 
-#[derive(Clone, Debug)]
-struct Compound {
-    ty: String,
-    contained: Vec<Instance>,
+#[derive(Clone, Debug, PartialEq)]
+pub struct Compound {
+    pub ty: String,
+    pub contained: Vec<Instance>,
 }
 
 impl Compound {
@@ -90,9 +88,9 @@ impl Compound {
 
 /// A definition is `ltype = expr`.
 #[derive(Clone, Debug)]
-struct Definiton {
-    ltype: String,
-    expr: Expression,
+pub struct Definiton {
+    pub ltype: String,
+    pub expr: Expression,
 }
 
 impl Definiton {
@@ -110,8 +108,8 @@ impl Definiton {
 
 /// An expression is a series of parameters that produce an output environment.
 #[derive(Clone, Debug)]
-struct Expression {
-    parameters: Vec<Parameter>,
+pub struct Expression {
+    pub parameters: Vec<Parameter>,
 }
 
 impl Expression {
@@ -128,7 +126,7 @@ impl Expression {
 /// A parameter is a single implicit or explicit type conversion/capture.
 /// This may include `!` to capture the whole environment.
 #[derive(Clone, Debug)]
-enum Parameter {
+pub enum Parameter {
     Explicit(Explicit),
     Implicit(String),
     Literal(Primitive),
@@ -156,9 +154,9 @@ impl Parameter {
 
 /// Defines an explicit conversion.
 #[derive(Clone, Debug)]
-struct Explicit {
-    target: String,
-    expr: Expression,
+pub struct Explicit {
+    pub target: String,
+    pub expr: Expression,
 }
 
 impl Explicit {
@@ -176,11 +174,11 @@ impl Explicit {
 }
 
 /// An Environment contains all of the definitions and instances available to a given explicit conversion.
-#[derive(Clone, Debug)]
-struct Environment<'a> {
-    definitions: Vec<Definiton>,
-    instances: Vec<Instance>,
-    parents: Vec<&'a Environment<'a>>,
+#[derive(Clone, Debug, Default)]
+pub struct Environment<'a> {
+    pub definitions: Vec<Definiton>,
+    pub instances: Vec<Instance>,
+    pub parents: Vec<&'a Environment<'a>>,
 }
 
 impl<'a> Environment<'a> {
@@ -196,7 +194,7 @@ impl<'a> Environment<'a> {
             .chain(self.parents.iter().flat_map(|p| p.definitions.iter()))
     }
 
-    fn implicit(&self, ty: &str) -> Option<Instance> {
+    pub fn implicit(&self, ty: &str) -> Option<Instance> {
         self.find_type(ty)
             .or_else(|| {
                 self.iter_definitons()

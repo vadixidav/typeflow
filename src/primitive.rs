@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::ops::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Primitive {
     String(Cow<'static, str>),
     F(f64),
@@ -54,7 +54,7 @@ pub fn prim_types() -> impl Iterator<Item = &'static str> {
 }
 
 pub fn is_prim_type(ty: &str) -> bool {
-    prim_types().find(|&s| s == ty).is_some()
+    prim_types().any(|s| s == ty)
 }
 
 impl Add for Primitive {
