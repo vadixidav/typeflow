@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::ops::*;
+use Instance;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Primitive {
@@ -47,6 +48,22 @@ impl Primitive {
             _ => None,
         }
     }
+}
+
+pub fn s<S: Into<Cow<'static, str>>>(s: S) -> Instance {
+    Instance::Primitive(Primitive::String(s.into()))
+}
+
+pub fn f(f: f64) -> Instance {
+    Instance::Primitive(Primitive::F(f))
+}
+
+pub fn i(i: i64) -> Instance {
+    Instance::Primitive(Primitive::I(i))
+}
+
+pub fn u(u: u64) -> Instance {
+    Instance::Primitive(Primitive::U(u))
 }
 
 pub fn prim_types() -> impl Iterator<Item = &'static str> {
