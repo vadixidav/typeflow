@@ -91,6 +91,7 @@ impl Expression {
 enum Parameter {
     Explicit(Explicit),
     Implicit(String),
+    Literal(Primitive),
 }
 
 impl Parameter {
@@ -99,6 +100,7 @@ impl Parameter {
         match self {
             Explicit(ep) => ep.resolve(env),
             Implicit(ty) => env.implicit(ty),
+            Literal(p) => Some(Instance::Primitive(p.clone())),
         }
     }
 
@@ -107,6 +109,7 @@ impl Parameter {
         match self {
             Explicit(ep) => &ep.target,
             Implicit(ip) => &ip,
+            Literal(p) => p.ty(),
         }
     }
 }
