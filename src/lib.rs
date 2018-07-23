@@ -66,6 +66,12 @@ impl Definiton {
     fn is_implicit(&self, ty: &str) -> bool {
         self.expr.produces().find(|&s| s == ty).is_some()
     }
+
+    /// Tries to extract a type implicitly using this definition
+    fn implicit(&self, ty: &str, env: &Environment) -> Option<Instance> {
+        self.is_implicit(ty)
+            .and_option_from(|| env.implicit(&self.ltype).and_then(|ins| ins.extract(ty)))
+    }
 }
 
 /// An expression is a series of parameters that produce an output environment.
@@ -156,16 +162,15 @@ impl<'a> Environment<'a> {
             .chain(self.parents.iter().flat_map(|p| p.definitions.iter()))
     }
 
-    fn find_type(&self, ty: &str) -> Option<Instance> {
-        self.iter_instances().find(|ins| ins.is_type(&ty)).cloned()
-    }
-
     fn implicit(&self, ty: &str) -> Option<Instance> {
         self.find_type(ty).or_else(|| {
             self.iter_definitons()
-                .filter(|d| d.is_implicit(ty))
-                .filter_map(|d| self.implicit(&d.ltype).and_then(|ins| ins.extract(ty)))
+                .filter_map(|d| d.implicit(ty, self))
                 .next()
         })
+    }
+
+    fn find_type(&self, ty: &str) -> Option<Instance> {
+        self.iter_instances().find(|ins| ins.is_type(&ty)).cloned()
     }
 }
