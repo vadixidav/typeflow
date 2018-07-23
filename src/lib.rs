@@ -90,8 +90,8 @@ struct Expression {
 }
 
 impl Expression {
-    fn resolve<'a>(&'a self, env: &'a Environment) -> impl Iterator<Item = Instance> + 'a {
-        self.parameters.iter().filter_map(move |p| p.resolve(env))
+    fn resolve<'a>(&'a self, env: &'a Environment) -> impl Iterator<Item = Option<Instance>> + 'a {
+        self.parameters.iter().map(move |p| p.resolve(env))
     }
 
     /// Get the types that can be produced by this expression.
@@ -135,7 +135,15 @@ struct Explicit {
 
 impl Explicit {
     fn resolve(&self, env: &Environment) -> Option<Instance> {
-        unimplemented!()
+        self.expr
+            .resolve(env)
+            .collect::<Option<Vec<Instance>>>()
+            .map(|v| {
+                Instance::Compound(Rc::new(Compound {
+                    ty: self.target.clone(),
+                    contained: v,
+                }))
+            })
     }
 }
 
