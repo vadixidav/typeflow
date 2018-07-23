@@ -2,21 +2,15 @@
 extern crate nom;
 extern crate boolinator;
 
+mod primitive;
+use primitive::Primitive;
+
 use boolinator::Boolinator;
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
 enum Instance {
-    I64(i64),
-    U64(u64),
-    I32(i32),
-    U32(u32),
-    I16(i16),
-    U16(u16),
-    I8(i8),
-    U8(u8),
-    F64(f64),
-    F32(f32),
+    Primitive(Primitive),
     Compound(Rc<Compound>),
 }
 
@@ -28,16 +22,7 @@ impl Instance {
     fn ty<'a>(&'a self) -> &'a str {
         use Instance::*;
         match self {
-            I64(_) => "i64",
-            U64(_) => "u64",
-            I32(_) => "i32",
-            U32(_) => "u32",
-            I16(_) => "i16",
-            U16(_) => "u16",
-            I8(_) => "i8",
-            U8(_) => "u8",
-            F64(_) => "f64",
-            F32(_) => "f32",
+            Primitive(p) => p.ty(),
             Compound(c) => &c.ty,
         }
     }
