@@ -5,3 +5,4 @@ authors = ["Geordon Worley <vadixidav@gmail.com>"]
 
 [dependencies]
 nom = "4.0.0"
+boolinator = "2.4.0"

@@ -1,7 +1,8 @@
 #[macro_use]
 extern crate nom;
+extern crate boolinator;
 
-use std::collections::{HashMap, HashSet};
+use boolinator::Boolinator;
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
@@ -19,16 +20,14 @@ enum Instance {
     Compound(Rc<Compound>),
 }
 
-#[derive(Clone, Debug)]
-struct Compound {
-    ty: String,
-    contained: Vec<Instance>,
-}
-
 impl Instance {
     fn is_type(&self, ty: &str) -> bool {
+        ty == self.ty()
+    }
+
+    fn ty<'a>(&'a self) -> &'a str {
         use Instance::*;
-        ty == match self {
+        match self {
             I64(_) => "i64",
             U64(_) => "u64",
             I32(_) => "i32",
@@ -42,6 +41,32 @@ impl Instance {
             Compound(c) => &c.ty,
         }
     }
+
+    /// Try and extract an instance of a type from this instance.
+    fn extract(&self, ty: &str) -> Option<Instance> {
+        (ty == self.ty()).as_some_from(|| self.clone()).or_else(|| {
+            if let Instance::Compound(c) = self {
+                c.extract(ty)
+            } else {
+                None
+            }
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+struct Compound {
+    ty: String,
+    contained: Vec<Instance>,
+}
+
+impl Compound {
+    fn extract(&self, ty: &str) -> Option<Instance> {
+        self.contained
+            .iter()
+            .filter_map(|ins| ins.extract(ty))
+            .next()
+    }
 }
 
 /// A definition is `ltype = expr`.
@@ -51,10 +76,28 @@ struct Definiton {
     expr: Expression,
 }
 
+impl Definiton {
+    /// Checks if a type can be implicitly produced from the `ltype` of this `Definition`.
+    fn is_implicit(&self, ty: &str) -> bool {
+        self.expr.produces().find(|&s| s == ty).is_some()
+    }
+}
+
 /// An expression is a series of parameters that produce an output environment.
 #[derive(Clone, Debug)]
 struct Expression {
     parameters: Vec<Parameter>,
+}
+
+impl Expression {
+    fn resolve<'a>(&'a self, env: &'a Environment) -> impl Iterator<Item = Instance> + 'a {
+        self.parameters.iter().filter_map(move |p| p.resolve(env))
+    }
+
+    /// Get the types that can be produced by this expression.
+    fn produces<'a>(&'a self) -> impl Iterator<Item = &'a str> {
+        self.parameters.iter().map(Parameter::produces)
+    }
 }
 
 /// A parameter is a single implicit or explicit type conversion/capture.
@@ -65,6 +108,24 @@ enum Parameter {
     Implicit(String),
 }
 
+impl Parameter {
+    fn resolve(&self, env: &Environment) -> Option<Instance> {
+        use Parameter::*;
+        match self {
+            Explicit(_ep) => unimplemented!(),
+            Implicit(ty) => env.implicit(ty),
+        }
+    }
+
+    fn produces<'a>(&'a self) -> &'a str {
+        use Parameter::*;
+        match self {
+            Explicit(ep) => &ep.target,
+            Implicit(ip) => &ip,
+        }
+    }
+}
+
 /// Defines an explicit conversion.
 #[derive(Clone, Debug)]
 struct Explicit {
@@ -72,26 +133,43 @@ struct Explicit {
     expr: Expression,
 }
 
+impl Explicit {
+    fn resolve(&self, env: &Environment) -> Option<Instance> {
+        unimplemented!()
+    }
+}
+
 /// An Environment contains all of the definitions and instances available to a given explicit conversion.
 #[derive(Clone, Debug)]
 struct Environment<'a> {
     definitions: Vec<Definiton>,
     instances: Vec<Instance>,
-    /// Parent instances are drawn from after this environment.
-    /// Parent definitions are tried after this environment's definitions, but are tried for all instances.
     parents: Vec<&'a Environment<'a>>,
 }
 
 impl<'a> Environment<'a> {
-    pub fn resolve_param(&self, param: Parameter) -> Option<Instance> {
-        match param {
-            Parameter::Explicit(_ep) => unimplemented!(),
-            Parameter::Implicit(ty) => self
-                .instances
-                .iter()
-                .chain(self.parents.iter().flat_map(|p| p.instances.iter()))
-                .find(|ins| ins.is_type(&ty))
-                .cloned(),
-        }
+    fn iter_instances(&'a self) -> impl Iterator<Item = &'a Instance> {
+        self.instances
+            .iter()
+            .chain(self.parents.iter().flat_map(|p| p.instances.iter()))
+    }
+
+    fn iter_definitons(&'a self) -> impl Iterator<Item = &'a Definiton> {
+        self.definitions
+            .iter()
+            .chain(self.parents.iter().flat_map(|p| p.definitions.iter()))
+    }
+
+    fn find_type(&self, ty: &str) -> Option<Instance> {
+        self.iter_instances().find(|ins| ins.is_type(&ty)).cloned()
+    }
+
+    fn implicit(&self, ty: &str) -> Option<Instance> {
+        self.find_type(ty).or_else(|| {
+            self.iter_definitons()
+                .filter(|d| d.is_implicit(ty))
+                .filter_map(|d| self.implicit(&d.ltype))
+                .next()
+        })
     }
 }
