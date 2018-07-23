@@ -112,7 +112,7 @@ impl Parameter {
     fn resolve(&self, env: &Environment) -> Option<Instance> {
         use Parameter::*;
         match self {
-            Explicit(_ep) => unimplemented!(),
+            Explicit(ep) => ep.resolve(env),
             Implicit(ty) => env.implicit(ty),
         }
     }
@@ -168,7 +168,7 @@ impl<'a> Environment<'a> {
         self.find_type(ty).or_else(|| {
             self.iter_definitons()
                 .filter(|d| d.is_implicit(ty))
-                .filter_map(|d| self.implicit(&d.ltype))
+                .filter_map(|d| self.implicit(&d.ltype).and_then(|ins| ins.extract(ty)))
                 .next()
         })
     }
