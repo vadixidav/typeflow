@@ -1,15 +1,8 @@
 extern crate typeflow as tf;
 
-use std::rc::Rc;
-use tf::{i, u, Compound, Environment, Instance, Primitive};
+use tf::{c, e, f, i, u};
 
 fn main() {
-    let env = Environment {
-        instances: vec![Instance::Compound(Rc::new(Compound {
-            ty: "+".to_owned(),
-            contained: vec![u(2), u(3)],
-        }))],
-        ..Default::default()
-    };
-    assert_eq!(env.implicit("i"), Some(i(5)));
+    let env = e().ins(c("+", vec![i(2), u(5)]));
+    assert_eq!(env.implicit("i"), Some(f(5.0)));
 }

@@ -43,11 +43,7 @@ impl Instance {
         if let Instance::Primitive(p) = self {
             Some(p.clone())
         } else {
-            let local_env = Environment {
-                definitions: vec![],
-                instances: vec![self.clone()],
-                parents: vec![env],
-            };
+            let mut local_env = e().parent(env).ins(self.clone());
 
             prim_types()
                 .filter_map(|ty| local_env.implicit(ty))
@@ -73,7 +69,7 @@ impl Instance {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Compound {
-    pub ty: String,
+    pub ty: Rc<str>,
     pub contained: Vec<Instance>,
 }
 
@@ -88,12 +84,12 @@ impl Compound {
 
 /// A definition is `ltype = expr`.
 #[derive(Clone, Debug)]
-pub struct Definiton {
-    pub ltype: String,
+pub struct Definition {
+    pub ltype: Rc<str>,
     pub expr: Expression,
 }
 
-impl Definiton {
+impl Definition {
     /// Checks if a type can be implicitly produced from the `ltype` of this `Definition`.
     fn is_implicit(&self, ty: &str) -> bool {
         self.expr.produces().find(|&s| s == ty).is_some()
@@ -109,17 +105,17 @@ impl Definiton {
 /// An expression is a series of parameters that produce an output environment.
 #[derive(Clone, Debug)]
 pub struct Expression {
-    pub parameters: Vec<Parameter>,
+    pub params: Vec<Parameter>,
 }
 
 impl Expression {
     fn resolve<'a>(&'a self, env: &'a Environment) -> impl Iterator<Item = Option<Instance>> + 'a {
-        self.parameters.iter().map(move |p| p.resolve(env))
+        self.params.iter().map(move |p| p.resolve(env))
     }
 
     /// Get the types that can be produced by this expression.
     fn produces<'a>(&'a self) -> impl Iterator<Item = &'a str> {
-        self.parameters.iter().map(Parameter::produces)
+        self.params.iter().map(Parameter::produces)
     }
 }
 
@@ -155,7 +151,7 @@ impl Parameter {
 /// Defines an explicit conversion.
 #[derive(Clone, Debug)]
 pub struct Explicit {
-    pub target: String,
+    pub target: Rc<str>,
     pub expr: Expression,
 }
 
@@ -176,7 +172,7 @@ impl Explicit {
 /// An Environment contains all of the definitions and instances available to a given explicit conversion.
 #[derive(Clone, Debug, Default)]
 pub struct Environment<'a> {
-    pub definitions: Vec<Definiton>,
+    pub definitions: Vec<Definition>,
     pub instances: Vec<Instance>,
     pub parents: Vec<&'a Environment<'a>>,
 }
@@ -188,7 +184,7 @@ impl<'a> Environment<'a> {
             .chain(self.parents.iter().flat_map(|p| p.instances.iter()))
     }
 
-    fn iter_definitons(&'a self) -> impl Iterator<Item = &'a Definiton> {
+    fn iter_Definitions(&'a self) -> impl Iterator<Item = &'a Definition> {
         self.definitions
             .iter()
             .chain(self.parents.iter().flat_map(|p| p.definitions.iter()))
@@ -197,7 +193,7 @@ impl<'a> Environment<'a> {
     pub fn implicit(&self, ty: &str) -> Option<Instance> {
         self.find_type(ty)
             .or_else(|| {
-                self.iter_definitons()
+                self.iter_Definitions()
                     .filter_map(|d| d.implicit(ty, self))
                     .next()
             })
@@ -227,8 +223,41 @@ impl<'a> Environment<'a> {
             None
         }
     }
+
+    pub fn def(mut self, def: Definition) -> Self {
+        self.definitions.push(def);
+        self
+    }
+
+    pub fn ins(mut self, ins: Instance) -> Self {
+        self.instances.push(ins);
+        self
+    }
+
+    pub fn parent(mut self, parent: &'a Environment<'a>) -> Self {
+        self.parents.push(parent);
+        self
+    }
 }
 
 fn ordered_types() -> impl Iterator<Item = String> {
     (0..).map(|n| format!("@{}", n))
+}
+
+pub fn c(ty: &str, contained: Vec<Instance>) -> Instance {
+    Instance::Compound(Rc::new(Compound {
+        ty: ty.into(),
+        contained,
+    }))
+}
+
+pub fn e<'a>() -> Environment<'a> {
+    Environment::default()
+}
+
+pub fn d(ltype: &str, params: Vec<Parameter>) -> Definition {
+    Definition {
+        ltype: ltype.into(),
+        expr: Expression { params },
+    }
 }
