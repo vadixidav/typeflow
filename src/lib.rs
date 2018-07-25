@@ -160,7 +160,7 @@ impl Explicit {
 pub struct Environment<'a> {
     pub definitions: Vec<Definition>,
     pub instances: Vec<Instance>,
-    pub parents: Vec<&'a Environment<'a>>,
+    pub parent: Option<&'a Environment<'a>>,
 }
 
 impl<'a> Environment<'a> {
@@ -173,7 +173,7 @@ impl<'a> Environment<'a> {
     fn iter_definitions(&'a self) -> impl Iterator<Item = &'a Definition> {
         self.definitions
             .iter()
-            .chain(self.parents.iter().flat_map(|p| p.definitions.iter()))
+            .chain(self.parent.iter().flat_map(|p| p.definitions.iter()))
     }
 
     pub fn implicit(&self, ty: &str) -> Option<Instance> {
@@ -210,13 +210,7 @@ impl<'a> Environment<'a> {
                         .map(|ty| c.extract(&ty))
                         .while_some()
                         .map(Instance::must_be_compound)
-                        .map(|c| {
-                            Environment {
-                                definitions: vec![],
-                                instances: c.contained.clone(),
-                                parents: vec![self],
-                            }.try_primitive()
-                        })
+                        .map(|c| e(self).all_ins(c.contained.clone()).try_primitive())
                         .while_some()
                         .fold1(|a, b| a + b)
                         .and_then(|p| p.implicit(ty))
@@ -238,8 +232,8 @@ impl<'a> Environment<'a> {
         self
     }
 
-    pub fn parent(mut self, parent: &'a Environment<'a>) -> Self {
-        self.parents.push(parent);
+    pub fn all_ins(mut self, ins: Vec<Instance>) -> Self {
+        self.instances = ins;
         self
     }
 }
@@ -255,8 +249,12 @@ pub fn c(ty: &str, contained: Vec<Instance>) -> Instance {
     }))
 }
 
-pub fn e<'a>() -> Environment<'a> {
-    Environment::default()
+pub fn e<'a, E: Into<Option<&'a Environment<'a>>>>(e: E) -> Environment<'a> {
+    Environment {
+        definitions: vec![],
+        instances: vec![],
+        parent: e.into(),
+    }
 }
 
 pub fn d(ltype: &str, params: Vec<Parameter>) -> Definition {
