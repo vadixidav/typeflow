@@ -5,6 +5,11 @@ use Instance;
 
 pub use Primitive::*;
 
+pub const STYPE: &str = "s";
+pub const FTYPE: &str = "f";
+pub const ITYPE: &str = "i";
+pub const UTYPE: &str = "u";
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Primitive {
     S(Rc<str>),
@@ -16,33 +21,33 @@ pub enum Primitive {
 impl Primitive {
     pub fn ty(&self) -> &str {
         match self {
-            S(_) => "str",
-            F(_) => "f",
-            I(_) => "i",
-            U(_) => "u",
+            S(_) => STYPE,
+            F(_) => FTYPE,
+            I(_) => ITYPE,
+            U(_) => UTYPE,
         }
     }
 
     pub fn implicit(&self, ty: &str) -> Option<Primitive> {
         match ty {
-            "str" => Some(match self {
+            STYPE => Some(match self {
                 S(s) => S(s.clone()),
                 F(f) => S(f.to_string().into()),
                 I(i) => S(i.to_string().into()),
                 U(u) => S(u.to_string().into()),
             }),
-            "f" => match self {
+            FTYPE => match self {
                 F(f) => Some(F(*f)),
                 I(i) => Some(F(*i as f64)),
                 U(u) => Some(F(*u as f64)),
                 _ => None,
             },
-            "i" => match self {
+            ITYPE => match self {
                 I(i) => Some(I(*i)),
                 U(u) => Some(I(*u as i64)),
                 _ => None,
             },
-            "u" => match self {
+            UTYPE => match self {
                 U(u) => Some(U(*u)),
                 _ => None,
             },
@@ -52,7 +57,7 @@ impl Primitive {
 }
 
 pub fn prim_types() -> impl DoubleEndedIterator<Item = &'static str> {
-    ["str", "f", "i", "u"].into_iter().cloned()
+    [STYPE, FTYPE, ITYPE, UTYPE].into_iter().cloned()
 }
 
 pub fn is_prim_type(ty: &str) -> bool {

@@ -107,7 +107,10 @@ pub struct Expression {
 }
 
 impl Expression {
-    fn resolve<'a>(&'a self, env: &'a Environment) -> impl Iterator<Item = Option<Instance>> + 'a {
+    fn resolve<'a>(
+        &'a self,
+        env: &'a Environment,
+    ) -> impl DoubleEndedIterator<Item = Option<Instance>> + 'a {
         self.params.iter().map(move |p| p.resolve(env))
     }
 
@@ -167,8 +170,10 @@ pub struct Explicit {
 
 impl Explicit {
     pub fn resolve(&self, env: &Environment) -> Option<Instance> {
+        // We need to reverse the iterator so the first parameters have highest priority.
         self.expr
             .resolve(env)
+            .rev()
             .collect::<Option<Vec<Instance>>>()
             .map(|v| {
                 Compound {
@@ -200,6 +205,11 @@ impl<'a> Environment<'a> {
                 Box::new(p.iter_definitions()) as Box<Iterator<Item = &'a Definition>>
             }),
         )
+    }
+
+    pub fn run(&mut self, e: &Explicit) {
+        let res = e.resolve(self);
+        self.instances.extend(res);
     }
 
     pub fn implicit(&self, ty: &str) -> Option<Instance> {
