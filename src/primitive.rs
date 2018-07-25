@@ -66,7 +66,7 @@ pub fn u(u: u64) -> Instance {
     Instance::Primitive(Primitive::U(u))
 }
 
-pub fn prim_types() -> impl Iterator<Item = &'static str> {
+pub fn prim_types() -> impl DoubleEndedIterator<Item = &'static str> {
     ["str", "f", "i", "u"].into_iter().cloned()
 }
 

@@ -38,31 +38,17 @@ impl Instance {
         })
     }
 
-    /// Try and implicitly convert this `Instance` to a primitive.
-    fn try_primitive(&self, env: &Environment) -> Option<Primitive> {
-        if let Instance::Primitive(p) = self {
-            Some(p.clone())
-        } else {
-            let mut local_env = e().parent(env).ins(self.clone());
-
-            prim_types()
-                .filter_map(|ty| local_env.implicit(ty))
-                .map(|ins| ins.must_be_primitive())
-                .next()
-        }
-    }
-
-    fn must_be_primitive(&self) -> Primitive {
-        match self {
-            Instance::Primitive(p) => p.clone(),
-            _ => unreachable!(),
-        }
-    }
-
-    fn must_be_compound(&self) -> Rc<Compound> {
+    fn must_be_compound(self) -> Rc<Compound> {
         match self {
             Instance::Compound(c) => c.clone(),
             _ => unreachable!(),
+        }
+    }
+
+    fn try_primitive(&self) -> Option<Primitive> {
+        match self {
+            Instance::Primitive(p) => Some(p.clone()),
+            _ => None,
         }
     }
 }
@@ -178,13 +164,13 @@ pub struct Environment<'a> {
 }
 
 impl<'a> Environment<'a> {
-    fn iter_instances(&'a self) -> impl Iterator<Item = &'a Instance> {
-        self.instances
-            .iter()
-            .chain(self.parents.iter().flat_map(|p| p.instances.iter()))
+    /// Iterate over instances. We don't inherit instances from parents.
+    fn iter_instances(&self) -> impl Iterator<Item = &Instance> {
+        self.instances.iter()
     }
 
-    fn iter_Definitions(&'a self) -> impl Iterator<Item = &'a Definition> {
+    /// Iterate over definitions. We inherit all definitions from parents.
+    fn iter_definitions(&'a self) -> impl Iterator<Item = &'a Definition> {
         self.definitions
             .iter()
             .chain(self.parents.iter().flat_map(|p| p.definitions.iter()))
@@ -193,7 +179,7 @@ impl<'a> Environment<'a> {
     pub fn implicit(&self, ty: &str) -> Option<Instance> {
         self.find_type(ty)
             .or_else(|| {
-                self.iter_Definitions()
+                self.iter_definitions()
                     .filter_map(|d| d.implicit(ty, self))
                     .next()
             })
@@ -204,21 +190,39 @@ impl<'a> Environment<'a> {
         self.iter_instances().find(|ins| ins.is_type(&ty)).cloned()
     }
 
+    /// Try and implicitly convert this `Environment` to a primitive.
+    fn try_primitive(&self) -> Option<Primitive> {
+        prim_types()
+            .rev()
+            .filter_map(|ty| self.implicit(ty))
+            .filter_map(|ins| ins.try_primitive())
+            .next()
+    }
+
     /// Try to use built-in implicit conversions.
     fn try_builtin(&self, ty: &str) -> Option<Instance> {
         if is_prim_type(ty) {
-            self.implicit("+")
+            let add = self
+                .implicit("+")
                 .map(|ins| ins.must_be_compound())
                 .and_then(|c| {
                     ordered_types()
                         .map(|ty| c.extract(&ty))
                         .while_some()
-                        .map(|ins| ins.try_primitive(self))
-                        .fold1(|a, b| a.and_then(|a| b.map(|b| a + b)))
-                        .and_then(|a| a)
+                        .map(Instance::must_be_compound)
+                        .map(|c| {
+                            Environment {
+                                definitions: vec![],
+                                instances: c.contained.clone(),
+                                parents: vec![self],
+                            }.try_primitive()
+                        })
+                        .while_some()
+                        .fold1(|a, b| a + b)
                         .and_then(|p| p.implicit(ty))
                         .map(Instance::Primitive)
-                })
+                });
+            add
         } else {
             None
         }
