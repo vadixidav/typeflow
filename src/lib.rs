@@ -19,7 +19,7 @@ impl Instance {
         ty == self.ty()
     }
 
-    fn ty<'a>(&'a self) -> &'a str {
+    fn ty(&self) -> &str {
         use Instance::*;
         match self {
             Primitive(p) => p.ty(),
@@ -78,7 +78,7 @@ pub struct Definition {
 impl Definition {
     /// Checks if a type can be implicitly produced from the `ltype` of this `Definition`.
     fn is_implicit(&self, ty: &str) -> bool {
-        self.expr.produces().find(|&s| s == ty).is_some()
+        self.expr.produces().any(|s| s == ty)
     }
 
     /// Tries to extract a type implicitly using this definition
@@ -100,7 +100,7 @@ impl Expression {
     }
 
     /// Get the types that can be produced by this expression.
-    fn produces<'a>(&'a self) -> impl Iterator<Item = &'a str> {
+    fn produces(&self) -> impl Iterator<Item = &str> {
         self.params.iter().map(Parameter::produces)
     }
 }
@@ -124,7 +124,7 @@ impl Parameter {
         }
     }
 
-    fn produces<'a>(&'a self) -> &'a str {
+    fn produces(&self) -> &str {
         use Parameter::*;
         match self {
             Explicit(ep) => &ep.target,
@@ -202,8 +202,7 @@ impl<'a> Environment<'a> {
     /// Try to use built-in implicit conversions.
     fn try_builtin(&self, ty: &str) -> Option<Instance> {
         if is_prim_type(ty) {
-            let add = self
-                .implicit("+")
+            self.implicit("+")
                 .map(|ins| ins.must_be_compound())
                 .and_then(|c| {
                     ordered_types()
@@ -215,8 +214,7 @@ impl<'a> Environment<'a> {
                         .fold1(|a, b| a + b)
                         .and_then(|p| p.implicit(ty))
                         .map(Instance::Primitive)
-                });
-            add
+                })
         } else {
             None
         }
