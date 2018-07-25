@@ -1,0 +1,8 @@
+[package]
+name = "typeflow-lang"
+version = "0.1.0"
+authors = ["Geordon Worley <vadixidav@gmail.com>"]
+
+[dependencies]
+combine = "3.3.6"
+typeflow-engine = { path = "../engine" }
