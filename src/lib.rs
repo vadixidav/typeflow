@@ -53,6 +53,18 @@ impl Instance {
     }
 }
 
+impl From<Compound> for Instance {
+    fn from(c: Compound) -> Instance {
+        Instance::Compound(Rc::new(c))
+    }
+}
+
+impl From<Primitive> for Instance {
+    fn from(p: Primitive) -> Instance {
+        Instance::Primitive(p)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Compound {
     pub ty: Rc<str>,
@@ -134,6 +146,18 @@ impl Parameter {
     }
 }
 
+impl From<Primitive> for Parameter {
+    fn from(p: Primitive) -> Parameter {
+        Parameter::Literal(p)
+    }
+}
+
+impl From<Explicit> for Parameter {
+    fn from(e: Explicit) -> Parameter {
+        Parameter::Explicit(e)
+    }
+}
+
 /// Defines an explicit conversion.
 #[derive(Clone, Debug)]
 pub struct Explicit {
@@ -142,15 +166,15 @@ pub struct Explicit {
 }
 
 impl Explicit {
-    fn resolve(&self, env: &Environment) -> Option<Instance> {
+    pub fn resolve(&self, env: &Environment) -> Option<Instance> {
         self.expr
             .resolve(env)
             .collect::<Option<Vec<Instance>>>()
             .map(|v| {
-                Instance::Compound(Rc::new(Compound {
+                Compound {
                     ty: self.target.clone(),
                     contained: v,
-                }))
+                }.into()
             })
     }
 }
@@ -171,9 +195,11 @@ impl<'a> Environment<'a> {
 
     /// Iterate over definitions. We inherit all definitions from parents.
     fn iter_definitions(&'a self) -> impl Iterator<Item = &'a Definition> {
-        self.definitions
-            .iter()
-            .chain(self.parent.iter().flat_map(|p| p.definitions.iter()))
+        self.definitions.iter().rev().chain(
+            self.parent.iter().flat_map(|p| {
+                Box::new(p.iter_definitions()) as Box<Iterator<Item = &'a Definition>>
+            }),
+        )
     }
 
     pub fn implicit(&self, ty: &str) -> Option<Instance> {
@@ -209,7 +235,7 @@ impl<'a> Environment<'a> {
                         .map(|ty| c.extract(&ty))
                         .while_some()
                         .map(Instance::must_be_compound)
-                        .map(|c| e(self).all_ins(c.contained.clone()).try_primitive())
+                        .map(|c| env(self).all_ins(c.contained.clone()).try_primitive())
                         .while_some()
                         .fold1(|a, b| a + b)
                         .and_then(|p| p.implicit(ty))
@@ -240,14 +266,41 @@ fn ordered_types() -> impl Iterator<Item = String> {
     (0..).map(|n| format!("@{}", n))
 }
 
-pub fn c(ty: &str, contained: Vec<Instance>) -> Instance {
-    Instance::Compound(Rc::new(Compound {
-        ty: ty.into(),
-        contained,
-    }))
+pub fn otype(n: usize) -> String {
+    ordered_types().nth(n).unwrap()
 }
 
-pub fn e<'a, E: Into<Option<&'a Environment<'a>>>>(e: E) -> Environment<'a> {
+pub fn oins(n: usize, ins: Instance) -> Instance {
+    Compound {
+        ty: otype(n).into(),
+        contained: vec![ins],
+    }.into()
+}
+
+pub fn oexp(n: usize, param: Parameter) -> Parameter {
+    Explicit {
+        target: otype(n).into(),
+        expr: Expression {
+            params: vec![param],
+        },
+    }.into()
+}
+
+pub fn c(ty: &str, contained: Vec<Instance>) -> Instance {
+    Compound {
+        ty: ty.into(),
+        contained,
+    }.into()
+}
+
+pub fn e(target: &str, params: Vec<Parameter>) -> Explicit {
+    Explicit {
+        target: target.into(),
+        expr: Expression { params },
+    }
+}
+
+pub fn env<'a, E: Into<Option<&'a Environment<'a>>>>(e: E) -> Environment<'a> {
     Environment {
         definitions: vec![],
         instances: vec![],
