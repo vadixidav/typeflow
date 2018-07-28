@@ -1,4 +1,4 @@
-extern crate typeflow as tf;
+extern crate typeflow_engine as tf;
 
 use tf::{c, d, e, env, f, i, oexp, oins, u, Parameter::Implicit, I, U};
 
@@ -12,7 +12,7 @@ fn add_upcasting() {
 fn add_resolve() {
     let mut env = env(None);
     // +(2,3)
-    env.run(&e("+", vec![oexp(0, I(2).into()), oexp(1, U(3).into())]));
+    env.run(&e("+", vec![oexp(0, I(2).into()), oexp(1, U(3).into())]).into());
     assert_eq!(env.implicit("f"), Some(f(5.0)));
 }
 
@@ -35,13 +35,15 @@ fn add_newtype_resolve() {
         .def(d("b", vec![Implicit("u".into())]));
 
     // +(a(2),b(3))
-    env.run(&e(
-        "+",
-        vec![
-            oexp(0, e("a", vec![I(2).into()]).into()),
-            oexp(1, e("b", vec![U(3).into()]).into()),
-        ],
-    ));
+    env.run(
+        &e(
+            "+",
+            vec![
+                oexp(0, e("a", vec![I(2).into()]).into()),
+                oexp(1, e("b", vec![U(3).into()]).into()),
+            ],
+        ).into(),
+    );
 
     assert_eq!(env.implicit("f"), Some(f(5.0)));
 }

@@ -207,8 +207,8 @@ impl<'a> Environment<'a> {
         )
     }
 
-    pub fn run(&mut self, e: &Explicit) {
-        let res = e.resolve(self);
+    pub fn run(&mut self, p: &Parameter) {
+        let res = p.resolve(self);
         self.instances.extend(res);
     }
 
