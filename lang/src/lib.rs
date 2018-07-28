@@ -1,27 +1,25 @@
-#[macro_use]
 extern crate combine;
 extern crate typeflow_engine as tf;
 
-use combine::char::{alpha_num, char, digit, letter, space, spaces};
+use combine::char::{char, digit, spaces};
 use combine::combinator::recognize;
+use combine::easy;
 use combine::{
     any, between, many1, none_of, optional, sep_by, skip_many, skip_many1, token, value,
     ParseError, Parser, Stream,
 };
 
-use std::rc::Rc;
+const RESERVED_TOKENS: &str = " ,()";
 
-const reserved_tokens: &str = " ,()";
-
-fn param<I>() -> impl Parser<Input = I, Output = tf::Parameter>
+pub fn param<I>() -> impl Parser<Input = easy::Stream<I>, Output = tf::Parameter>
 where
     I: Stream<Item = char>,
-    I::Error: ParseError<I::Item, I::Range, I::Position>,
+    I::Error:
+        ParseError<I::Item, I::Range, I::Position, StreamError = easy::Error<I::Item, I::Range>>,
 {
-    let ltoken = many1(none_of(reserved_tokens.chars()));
+    let ltoken = many1(none_of(RESERVED_TOKENS.chars()));
     let lchar = |c| char(c).skip(spaces());
-    let params = between(token('('), token(')'), sep_by(param(), lchar(',')));
-    let string = between(token('"'), token('"'), any()).map(|s: String| tf::S(s.into()));
+    let string = between(token('"'), token('"'), many1(any())).map(|s: String| tf::S(s.into()));
     let float = recognize((
         skip_many1(digit()),
         optional((token('.'), skip_many(digit()))),
@@ -37,9 +35,10 @@ where
         .or(float)
         .or(string)
         .map(tf::Parameter::Literal);
-    primitive.or(ltoken.then(|t: String| {
-        params
-            .map(|p: Vec<tf::Parameter>| tf::e(&t, p))
-            .or(value(tf::Parameter::Implicit(t)))
+    primitive.or(ltoken.then(move |t: String| {
+        let t2 = t.clone();
+        between(token('('), token(')'), sep_by(param(), lchar(',')))
+            .map(move |p: Vec<tf::Parameter>| tf::e(&t, p).into())
+            .or(value(tf::Parameter::Implicit(t2)))
     }))
 }
