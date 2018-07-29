@@ -46,14 +46,3 @@ fn add_newtype_nodef() {
     // It currently stops at `@1` and returns the result, but it should fail the operation instead.
     assert_eq!(env.implicit("f"), None);
 }
-
-#[test]
-fn add_using_definitions() {
-    // +(@0 2, @1 3)
-    let env = env().run(exp(
-        "+",
-        vec![d("@0", vec![I(2).into()]), d("@1", vec![U(3).into()])],
-    ));
-
-    assert_eq!(env.implicit("f"), Some(f(5.0)));
-}

@@ -283,20 +283,6 @@ impl<'a> Lexicon<'a> {
             .or_else(|| self.try_builtin(data, ty))
     }
 
-    fn explicit(&self, data: &Data, ty: &str) -> Data {
-        Data {
-            instances: vec![self.implicit(&data, &ty).unwrap_or_else(|| {
-                Compound {
-                    ty: ty.into(),
-                    env: Environment {
-                        data: data.clone(),
-                        ..Default::default()
-                    },
-                }.into()
-            })],
-        }
-    }
-
     /// Try to use built-in implicit conversions.
     fn try_builtin(&self, data: &Data, ty: &str) -> Option<Instance> {
         if is_prim_type(ty) {
@@ -309,9 +295,8 @@ impl<'a> Lexicon<'a> {
                         .while_some()
                         .map(Instance::must_be_compound)
                         .map(|c| lex.try_primitive(&c.env.data))
-                        .while_some()
-                        .fold1(|a, b| a + b)
-                        .and_then(|p| p.implicit(ty))
+                        .fold1(|a, b| a.and_then(|a| b.map(|b| a + b)))
+                        .and_then(|p| p.and_then(|p| p.implicit(ty)))
                         .map(Instance::Primitive)
                 })
         } else {
