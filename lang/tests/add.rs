@@ -7,11 +7,10 @@ use tf::{env, f};
 
 #[test]
 fn add() {
-    let param = tfl::param()
-        .easy_parse("+(@0 2, @1 3)")
+    let expression = tfl::exp()
+        .easy_parse("+(@0(2), @1(3))")
         .unwrap_or_else(|e| panic!("{}", e))
         .0;
-    let mut env = env(None);
-    env.run(&param);
+    let env = env().run(expression);
     assert_eq!(env.implicit("f"), Some(f(5.0)));
 }
