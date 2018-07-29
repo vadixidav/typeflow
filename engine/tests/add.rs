@@ -1,6 +1,6 @@
 extern crate typeflow_engine as tf;
 
-use tf::{d, e, env, exp, f, oe, Parameter::Implicit, I, U};
+use tf::{d, e, env, exp, f, imp, oe, I, U};
 
 #[test]
 fn add_upcasting() {
@@ -13,8 +13,8 @@ fn add_upcasting() {
 fn add_newtype() {
     // a i, b u, +(a(2),b(3))
     let env = env()
-        .run(d("a", vec![Implicit("i".into())]))
-        .run(d("b", vec![Implicit("u".into())]))
+        .run(d("a", vec![imp("i")]))
+        .run(d("b", vec![imp("u")]))
         .run(
             e(
                 "+",
@@ -31,7 +31,7 @@ fn add_newtype() {
 #[test]
 fn add_newtype_nodef() {
     // a i, +(a(2),b(3))
-    let env = env().run(d("a", vec![Implicit("i".into())])).run(
+    let env = env().run(d("a", vec![imp("i")])).run(
         e(
             "+",
             vec![

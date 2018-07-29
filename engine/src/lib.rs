@@ -477,3 +477,7 @@ pub fn d(ltype: &str, params: Vec<Parameter>) -> Expression {
         params,
     }.into()
 }
+
+pub fn imp(ty: &str) -> Parameter {
+    Parameter::Implicit(ty.into())
+}
