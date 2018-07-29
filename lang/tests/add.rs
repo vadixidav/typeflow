@@ -11,7 +11,6 @@ fn parse(s: &str) -> tf::Environment {
         .unwrap_or_else(|e| panic!("{}", e))
         .0
         .into_iter()
-        .inspect(|e| println!("{:?}", e))
         .fold(env(), |en, ex| en.run(ex))
 }
 
@@ -24,5 +23,11 @@ fn add() {
 #[test]
 fn add_newtype() {
     let env = parse("a u, b u, +(@0(a(2)), @1(b(3)))");
+    assert_eq!(env.implicit("f"), Some(f(5.0)));
+}
+
+#[test]
+fn add_newtype_prim_upcast() {
+    let env = parse("a i, b u, +(@0(a(2)), @1(b(3)))");
     assert_eq!(env.implicit("f"), Some(f(5.0)));
 }

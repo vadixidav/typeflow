@@ -60,6 +60,16 @@ pub fn prim_types() -> impl DoubleEndedIterator<Item = &'static str> {
     [STYPE, FTYPE, ITYPE, UTYPE].into_iter().cloned()
 }
 
+pub fn prim_pos(p: &str) -> Option<usize> {
+    prim_types().position(|s| s == p)
+}
+
+pub fn implict_prim_ty(from: &str, to: &str) -> bool {
+    prim_pos(from)
+        .and_then(|a| prim_pos(to).map(|b| a >= b))
+        .unwrap_or(false)
+}
+
 pub fn is_prim_type(ty: &str) -> bool {
     prim_types().any(|s| s == ty)
 }

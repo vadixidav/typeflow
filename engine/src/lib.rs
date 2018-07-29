@@ -32,13 +32,15 @@ impl Instance {
 
     /// Try and extract an instance of a type from this instance.
     fn extract(&self, ty: &str) -> Option<Instance> {
-        (ty == self.ty()).as_some_from(|| self.clone()).or_else(|| {
-            if let Instance::Compound(c) = self {
-                c.extract(ty)
-            } else {
-                None
-            }
-        })
+        (ty == self.ty() || implict_prim_ty(self.ty(), ty))
+            .as_some_from(|| self.clone())
+            .or_else(|| {
+                if let Instance::Compound(c) = self {
+                    c.extract(ty)
+                } else {
+                    None
+                }
+            })
     }
 
     fn must_be_compound(self) -> Rc<Compound> {
@@ -96,7 +98,7 @@ pub struct Definition {
 impl Definition {
     /// Checks if a type can be implicitly produced from the `ltype` of this `Definition`.
     fn is_implicit(&self, ty: &str) -> bool {
-        self.produces().any(|s| s == ty)
+        self.produces().any(|s| s == ty || implict_prim_ty(s, ty))
     }
 
     /// Tries to extract a type implicitly using this definition
