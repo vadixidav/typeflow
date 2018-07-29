@@ -11,6 +11,8 @@ use itertools::Itertools;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
+use std::fmt;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Instance {
     Primitive(Primitive),
@@ -70,6 +72,15 @@ impl From<Primitive> for Instance {
     }
 }
 
+impl fmt::Display for Instance {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Instance::Compound(c) => c.fmt(f),
+            Instance::Primitive(p) => p.fmt(f),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Compound {
     pub ty: Rc<str>,
@@ -85,6 +96,22 @@ impl Compound {
             .rev()
             .filter_map(|ins| ins.extract(ty))
             .next()
+    }
+}
+
+impl fmt::Display for Compound {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.ty)?;
+        let nins = self.env.data.instances.len();
+        if nins != 0 {
+            write!(f, "(")?;
+            for i in 0..nins - 1 {
+                write!(f, "{} ", self.env.data.instances[i])?;
+            }
+            write!(f, "{}", self.env.data.instances[nins - 1])?;
+            write!(f, ")")?;
+        }
+        Ok(())
     }
 }
 

@@ -1,6 +1,7 @@
 use std::ops::*;
 use std::rc::Rc;
 
+use std::fmt;
 use Instance;
 
 pub use Primitive::*;
@@ -52,6 +53,17 @@ impl Primitive {
                 _ => None,
             },
             _ => None,
+        }
+    }
+}
+
+impl fmt::Display for Primitive {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            S(a) => write!(f, "{}", a),
+            F(a) => write!(f, "{}", a),
+            I(a) => write!(f, "{}", a),
+            U(a) => write!(f, "{}", a),
         }
     }
 }
