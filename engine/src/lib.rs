@@ -1,11 +1,14 @@
 extern crate boolinator;
+extern crate either;
 extern crate itertools;
 
 mod primitive;
 pub use primitive::*;
 
 use boolinator::Boolinator;
+use either::Either;
 use itertools::Itertools;
+use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -53,7 +56,7 @@ impl Instance {
     }
 }
 
-impl From<Compound> for Instance {
+impl<'a> From<Compound> for Instance {
     fn from(c: Compound) -> Instance {
         Instance::Compound(Rc::new(c))
     }
@@ -68,61 +71,101 @@ impl From<Primitive> for Instance {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Compound {
     pub ty: Rc<str>,
-    pub contained: Vec<Instance>,
+    pub env: Environment,
 }
 
 impl Compound {
     fn extract(&self, ty: &str) -> Option<Instance> {
-        self.contained
+        self.env
+            .data
+            .instances
             .iter()
+            .rev()
             .filter_map(|ins| ins.extract(ty))
             .next()
     }
 }
 
-/// A definition is `ltype = expr`.
-#[derive(Clone, Debug)]
+/// A definition is `ltype = params`.
+#[derive(Clone, Debug, PartialEq)]
 pub struct Definition {
     pub ltype: Rc<str>,
-    pub expr: Expression,
+    pub params: Vec<Parameter>,
 }
 
 impl Definition {
     /// Checks if a type can be implicitly produced from the `ltype` of this `Definition`.
     fn is_implicit(&self, ty: &str) -> bool {
-        self.expr.produces().any(|s| s == ty)
+        self.produces().any(|s| s == ty)
     }
 
     /// Tries to extract a type implicitly using this definition
-    fn implicit(&self, ty: &str, env: &Environment) -> Option<Instance> {
-        self.is_implicit(ty)
-            .and_option_from(|| env.implicit(&self.ltype).and_then(|ins| ins.extract(ty)))
-    }
-}
-
-/// An expression is a series of parameters that produce an output environment.
-#[derive(Clone, Debug)]
-pub struct Expression {
-    pub params: Vec<Parameter>,
-}
-
-impl Expression {
-    fn resolve<'a>(
-        &'a self,
-        env: &'a Environment,
-    ) -> impl DoubleEndedIterator<Item = Option<Instance>> + 'a {
-        self.params.iter().map(move |p| p.resolve(env))
+    fn implicit(&self, lex: &Lexicon, data: &Data, ty: &str) -> Option<Instance> {
+        self.is_implicit(ty).and_option_from(|| {
+            lex.implicit(data, &self.ltype)
+                .and_then(|ins| ins.extract(ty))
+        })
     }
 
-    /// Get the types that can be produced by this expression.
+    /// Get the types that can be produced by this Arguments.
     fn produces(&self) -> impl Iterator<Item = &str> {
-        self.params.iter().map(Parameter::produces)
+        self.params.iter().map(|p| p.produces())
+    }
+}
+
+/// Arguments is a series of expressions that produce an output Data.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Arguments {
+    pub exprs: Vec<Expression>,
+}
+
+impl Arguments {
+    fn resolve(&self, lex: &Lexicon, data: &Data) -> Option<(Data, Scope)> {
+        let mut scope = Scope::default();
+        self.exprs
+            .iter()
+            .rev()
+            .filter_map(|a| match a {
+                Expression::Definition(d) => {
+                    scope.def(d.clone());
+                    None
+                }
+                Expression::Parameter(p) => Some(p),
+            })
+            .map(|p| p.resolve(lex, &data))
+            .collect::<Option<Vec<Instance>>>()
+            .map(|v| (v.into(), scope))
+    }
+}
+
+/// An Expression is either a Definition or a Parameter.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Expression {
+    Definition(Definition),
+    Parameter(Parameter),
+}
+
+impl From<Definition> for Expression {
+    fn from(d: Definition) -> Expression {
+        Expression::Definition(d)
+    }
+}
+
+impl From<Parameter> for Expression {
+    fn from(p: Parameter) -> Expression {
+        Expression::Parameter(p)
+    }
+}
+
+impl From<Primitive> for Expression {
+    fn from(p: Primitive) -> Expression {
+        Expression::Parameter(Parameter::Literal(p))
     }
 }
 
 /// A parameter is a single implicit or explicit type conversion/capture.
-/// This may include `!` to capture the whole environment.
-#[derive(Clone, Debug)]
+/// This may include `!` to capture the whole Data.
+#[derive(Clone, Debug, PartialEq)]
 pub enum Parameter {
     Explicit(Explicit),
     Implicit(String),
@@ -130,11 +173,21 @@ pub enum Parameter {
 }
 
 impl Parameter {
-    fn resolve(&self, env: &Environment) -> Option<Instance> {
+    fn resolve(&self, lex: &Lexicon, data: &Data) -> Option<Instance> {
         use Parameter::*;
         match self {
-            Explicit(ep) => ep.resolve(env),
-            Implicit(ty) => env.implicit(ty),
+            Explicit(ep) => ep.resolve(lex, data),
+            Implicit(ty) => (ty == "!")
+                .as_some_from(|| {
+                    Compound {
+                        ty: "!".into(),
+                        env: Environment {
+                            data: data.clone(),
+                            ..Default::default()
+                        },
+                    }.into()
+                })
+                .or_else(|| lex.implicit(data, ty)),
             Literal(p) => Some(Instance::Primitive(p.clone())),
         }
     }
@@ -162,90 +215,86 @@ impl From<Explicit> for Parameter {
 }
 
 /// Defines an explicit conversion.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Explicit {
     pub target: Rc<str>,
-    pub expr: Expression,
+    pub args: Arguments,
 }
 
 impl Explicit {
-    pub fn resolve(&self, env: &Environment) -> Option<Instance> {
-        // We need to reverse the iterator so the first parameters have highest priority.
-        self.expr
-            .resolve(env)
-            .rev()
-            .collect::<Option<Vec<Instance>>>()
-            .map(|v| {
+    fn resolve(&self, lex: &Lexicon, data: &Data) -> Option<Instance> {
+        self.args.resolve(lex, data).map(|(data, scope)| {
+            Instance::Compound(
                 Compound {
                     ty: self.target.clone(),
-                    contained: v,
-                }.into()
-            })
+                    env: Environment { data, scope },
+                }.into(),
+            )
+        })
     }
 }
 
-/// An Environment contains all of the definitions and instances available to a given explicit conversion.
-#[derive(Clone, Debug, Default)]
-pub struct Environment<'a> {
-    pub definitions: Vec<Definition>,
-    pub instances: Vec<Instance>,
-    pub parent: Option<&'a Environment<'a>>,
+/// A scope contains definitions in a given scope.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct Scope {
+    definitions: Vec<Definition>,
 }
 
-impl<'a> Environment<'a> {
-    /// Iterate over instances. We don't inherit instances from parents.
-    fn iter_instances(&self) -> impl Iterator<Item = &Instance> {
-        self.instances.iter()
+impl Scope {
+    pub fn def(&mut self, d: Definition) {
+        self.definitions.push(d);
+    }
+}
+
+impl From<Vec<Definition>> for Scope {
+    fn from(definitions: Vec<Definition>) -> Scope {
+        Scope { definitions }
+    }
+}
+
+/// A lexicon contains all the definitions known in a given context.
+#[derive(Clone, Debug, Default)]
+struct Lexicon<'a> {
+    scopes: Vec<&'a Scope>,
+}
+
+impl<'a> Lexicon<'a> {
+    fn new(scope: &'a Scope) -> Self {
+        Lexicon {
+            scopes: vec![scope],
+        }
     }
 
     /// Iterate over definitions. We inherit all definitions from parents.
     fn iter_definitions(&'a self) -> impl Iterator<Item = &'a Definition> {
-        self.definitions.iter().rev().chain(
-            self.parent.iter().flat_map(|p| {
-                Box::new(p.iter_definitions()) as Box<Iterator<Item = &'a Definition>>
-            }),
-        )
+        self.scopes
+            .iter()
+            .rev()
+            .flat_map(|s| s.definitions.iter().rev())
     }
 
-    pub fn run(&mut self, p: &Parameter) {
-        let res = p.resolve(self);
-        self.instances.extend(res);
-    }
-
-    pub fn implicit(&self, ty: &str) -> Option<Instance> {
-        self.find_type(ty)
+    pub fn implicit(&self, data: &Data, ty: &str) -> Option<Instance> {
+        data.find_type(ty)
             .or_else(|| {
                 self.iter_definitions()
-                    .filter_map(|d| d.implicit(ty, self))
+                    .filter_map(|d| d.implicit(self, data, ty))
                     .next()
             })
-            .or_else(|| self.try_builtin(ty))
-    }
-
-    fn find_type(&self, ty: &str) -> Option<Instance> {
-        self.iter_instances().find(|ins| ins.is_type(&ty)).cloned()
-    }
-
-    /// Try and implicitly convert this `Environment` to a primitive.
-    fn try_primitive(&self) -> Option<Primitive> {
-        prim_types()
-            .rev()
-            .filter_map(|ty| self.implicit(ty))
-            .filter_map(|ins| ins.try_primitive())
-            .next()
+            .or_else(|| self.try_builtin(data, ty))
     }
 
     /// Try to use built-in implicit conversions.
-    fn try_builtin(&self, ty: &str) -> Option<Instance> {
+    fn try_builtin(&self, data: &Data, ty: &str) -> Option<Instance> {
         if is_prim_type(ty) {
-            self.implicit("+")
+            self.implicit(data, "+")
                 .map(|ins| ins.must_be_compound())
                 .and_then(|c| {
+                    let lex = self.with(&c.env.scope);
                     ordered_types()
-                        .map(|ty| c.extract(&ty))
+                        .map(|ty| lex.implicit(&c.env.data, &ty))
                         .while_some()
                         .map(Instance::must_be_compound)
-                        .map(|c| env(self).all_ins(c.contained.clone()).try_primitive())
+                        .map(|c| c.env.try_primitive(&lex))
                         .while_some()
                         .fold1(|a, b| a + b)
                         .and_then(|p| p.implicit(ty))
@@ -256,23 +305,113 @@ impl<'a> Environment<'a> {
         }
     }
 
-    pub fn def(mut self, def: Definition) -> Self {
-        self.definitions.push(def);
-        self
-    }
-
-    pub fn ins(mut self, ins: Instance) -> Self {
-        self.instances.push(ins);
-        self
-    }
-
-    pub fn all_ins(mut self, ins: Vec<Instance>) -> Self {
-        self.instances = ins;
-        self
+    /// Erases the lifetime of the Scope reference internally since
+    /// it will be forgotten when this is dropped.
+    fn with<'b>(&'b self, scope: &Scope) -> ScopedLex<'a> {
+        unsafe {
+            (*(&self.scopes as *const Vec<&Scope> as *mut Vec<&Scope>))
+                .push(::std::mem::transmute(scope));
+            ScopedLex {
+                lex: &mut *(self as *const Lexicon<'a> as *mut Lexicon<'a>),
+            }
+        }
     }
 }
 
-fn ordered_types() -> impl Iterator<Item = String> {
+/// A `ScopedLex` scopes a `Scope` being added to a lexicon to its lifetime.
+/// This is helpful to ensure a sanitary `Lexicon` in the engine.
+struct ScopedLex<'a> {
+    lex: &'a mut Lexicon<'a>,
+}
+
+impl<'a> Deref for ScopedLex<'a> {
+    type Target = Lexicon<'a>;
+
+    fn deref(&self) -> &Lexicon<'a> {
+        self.lex
+    }
+}
+
+impl<'a> DerefMut for ScopedLex<'a> {
+    fn deref_mut(&mut self) -> &mut Lexicon<'a> {
+        self.lex
+    }
+}
+
+impl<'a> Drop for ScopedLex<'a> {
+    fn drop(&mut self) {
+        self.lex.scopes.pop();
+    }
+}
+
+/// An Data contains all of the instances available.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct Data {
+    instances: Vec<Instance>,
+}
+
+impl Data {
+    fn iter_instances(&self) -> impl Iterator<Item = &Instance> {
+        self.instances.iter()
+    }
+
+    fn find_type(&self, ty: &str) -> Option<Instance> {
+        use std::iter::once;
+        self.iter_instances()
+            .flat_map(|ins| match ins {
+                Instance::Compound(c) if &*c.ty == "!" => Either::Left(c.env.data.instances.iter()),
+                ins => Either::Right(once(ins)),
+            })
+            .find(|ins| ins.is_type(&ty))
+            .cloned()
+    }
+}
+
+impl From<Vec<Instance>> for Data {
+    fn from(instances: Vec<Instance>) -> Data {
+        Data { instances }
+    }
+}
+
+/// Represents `Data` and `Scope`.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Environment {
+    data: Data,
+    scope: Scope,
+}
+
+impl Environment {
+    /// Append an `Expression` to the `Environment`.
+    pub fn run(mut self, e: Expression) -> Self {
+        use Expression::*;
+        match e {
+            Definition(d) => self.scope.def(d),
+            Parameter(p) => {
+                let res = p.resolve(&Lexicon::new(&self.scope), &self.data);
+                self.data.instances.extend(res);
+            }
+        }
+        self
+    }
+
+    /// Try to solve a .
+    pub fn implicit(&self, ty: &str) -> Option<Instance> {
+        Lexicon::new(&self.scope).implicit(&self.data, ty)
+    }
+
+    /// Try and implicitly convert this `Data` to a primitive.
+    fn try_primitive(&self, lex: &Lexicon) -> Option<Primitive> {
+        // Inherit the `Environment` scope.
+        let lex = lex.with(&self.scope);
+        prim_types()
+            .rev()
+            .filter_map(|ty| lex.implicit(&self.data, ty))
+            .filter_map(|ins| ins.try_primitive())
+            .next()
+    }
+}
+
+pub fn ordered_types() -> impl Iterator<Item = String> {
     (0..).map(|n| format!("@{}", n))
 }
 
@@ -280,47 +419,35 @@ pub fn otype(n: usize) -> String {
     ordered_types().nth(n).unwrap()
 }
 
-pub fn oins(n: usize, ins: Instance) -> Instance {
-    Compound {
-        ty: otype(n).into(),
-        contained: vec![ins],
-    }.into()
+pub fn oe<P: Into<Parameter>>(n: usize, param: P) -> Expression {
+    Expression::Parameter(
+        Explicit {
+            target: otype(n).into(),
+            args: Arguments {
+                exprs: vec![Expression::Parameter(param.into())],
+            },
+        }.into(),
+    )
 }
 
-pub fn oexp(n: usize, param: Parameter) -> Parameter {
-    Explicit {
-        target: otype(n).into(),
-        expr: Expression {
-            params: vec![param],
-        },
-    }.into()
+pub fn env() -> Environment {
+    Environment::default()
 }
 
-pub fn c(ty: &str, contained: Vec<Instance>) -> Instance {
-    Compound {
-        ty: ty.into(),
-        contained,
-    }.into()
-}
-
-pub fn e(target: &str, params: Vec<Parameter>) -> Explicit {
+pub fn e(target: &str, exprs: Vec<Expression>) -> Parameter {
     Explicit {
         target: target.into(),
-        expr: Expression { params },
-    }
+        args: Arguments { exprs },
+    }.into()
 }
 
-pub fn env<'a, E: Into<Option<&'a Environment<'a>>>>(e: E) -> Environment<'a> {
-    Environment {
-        definitions: vec![],
-        instances: vec![],
-        parent: e.into(),
-    }
+pub fn exp(target: &str, exprs: Vec<Expression>) -> Expression {
+    Expression::Parameter(e(target, exprs))
 }
 
-pub fn d(ltype: &str, params: Vec<Parameter>) -> Definition {
+pub fn d(ltype: &str, params: Vec<Parameter>) -> Expression {
     Definition {
         ltype: ltype.into(),
-        expr: Expression { params },
-    }
+        params,
+    }.into()
 }
