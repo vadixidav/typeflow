@@ -32,17 +32,14 @@ impl Instance {
         }
     }
 
-    /// Try and extract an instance of a type from this instance.
+    /// Try and extract a type if it is this instance.
+    fn extract_self(&self, ty: &str) -> Option<Instance> {
+        (ty == self.ty() || implict_prim_ty(self.ty(), ty)).as_some_from(|| self.clone())
+    }
+
+    /// Try and extract a type if it is inside of this instance.
     fn extract(&self, ty: &str) -> Option<Instance> {
-        (ty == self.ty() || implict_prim_ty(self.ty(), ty))
-            .as_some_from(|| self.clone())
-            .or_else(|| {
-                if let Instance::Compound(c) = self {
-                    c.extract(ty)
-                } else {
-                    None
-                }
-            })
+        self.try_compound().and_then(|c| c.extract(ty))
     }
 
     fn must_be_compound(self) -> Rc<Compound> {
@@ -55,6 +52,13 @@ impl Instance {
     fn try_primitive(&self) -> Option<Primitive> {
         match self {
             Instance::Primitive(p) => Some(p.clone()),
+            _ => None,
+        }
+    }
+
+    fn try_compound(&self) -> Option<Rc<Compound>> {
+        match self {
+            Instance::Compound(c) => Some(c.clone()),
             _ => None,
         }
     }
@@ -94,7 +98,7 @@ impl Compound {
             .instances
             .iter()
             .rev()
-            .filter_map(|ins| ins.extract(ty))
+            .filter_map(|ins| ins.extract_self(ty))
             .next()
     }
 }
@@ -126,6 +130,11 @@ impl Definition {
     /// Checks if a type can be implicitly produced from the `ltype` of this `Definition`.
     fn is_implicit(&self, ty: &str) -> bool {
         self.produces().any(|s| s == ty || implict_prim_ty(s, ty))
+    }
+
+    /// Checks if a type can be explicitly produced by this definition.
+    fn is_explicit(&self, ty: &str) -> bool {
+        &*self.ltype == ty
     }
 
     /// Tries to extract a type implicitly using this definition
@@ -257,7 +266,7 @@ impl Explicit {
     fn resolve(&self, lex: &Lexicon, data: &Data) -> Option<Instance> {
         self.args
             .resolve(lex, data)
-            .and_then(|env| env.explicit(self.target.clone()))
+            .and_then(|env| env.explicit(lex, self.target.clone()))
     }
 }
 
@@ -436,8 +445,29 @@ impl Environment {
     }
 
     /// Use this environment to try and explicitly resolve a definition for a type.
-    pub fn explicit<S: Into<Rc<str>>>(&self, ty: S) -> Option<Instance> {
-        unimplemented!()
+    fn explicit<S: Into<Rc<str>>>(&self, lex: &Lexicon, ty: S) -> Option<Instance> {
+        let lex = lex.with(&self.scope);
+        let ty = ty.into();
+        let res = lex
+            .iter_definitions()
+            .filter(|d| d.is_explicit(&ty))
+            .filter_map(|d| {
+                d.params
+                    .iter()
+                    .map(|p| p.resolve(&lex, &self.data))
+                    .collect::<Option<Vec<Instance>>>()
+                    .map(|instances| {
+                        Compound {
+                            ty: ty.clone(),
+                            env: Environment {
+                                data: Data { instances },
+                                ..Default::default()
+                            },
+                        }.into()
+                    })
+            })
+            .next();
+        res
     }
 }
 
