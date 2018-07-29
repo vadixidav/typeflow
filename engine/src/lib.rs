@@ -273,7 +273,7 @@ impl<'a> Lexicon<'a> {
             .flat_map(|s| s.definitions.iter().rev())
     }
 
-    pub fn implicit(&self, data: &Data, ty: &str) -> Option<Instance> {
+    fn implicit(&self, data: &Data, ty: &str) -> Option<Instance> {
         data.find_type(ty)
             .or_else(|| {
                 self.iter_definitions()
@@ -281,6 +281,20 @@ impl<'a> Lexicon<'a> {
                     .next()
             })
             .or_else(|| self.try_builtin(data, ty))
+    }
+
+    fn explicit(&self, data: &Data, ty: &str) -> Data {
+        Data {
+            instances: vec![self.implicit(&data, &ty).unwrap_or_else(|| {
+                Compound {
+                    ty: ty.into(),
+                    env: Environment {
+                        data: data.clone(),
+                        ..Default::default()
+                    },
+                }.into()
+            })],
+        }
     }
 
     /// Try to use built-in implicit conversions.
@@ -294,7 +308,7 @@ impl<'a> Lexicon<'a> {
                         .map(|ty| lex.implicit(&c.env.data, &ty))
                         .while_some()
                         .map(Instance::must_be_compound)
-                        .map(|c| c.env.try_primitive(&lex))
+                        .map(|c| lex.try_primitive(&c.env.data))
                         .while_some()
                         .fold1(|a, b| a + b)
                         .and_then(|p| p.implicit(ty))
@@ -303,6 +317,15 @@ impl<'a> Lexicon<'a> {
         } else {
             None
         }
+    }
+
+    /// Try and implicitly convert this `Data` to a primitive.
+    fn try_primitive(&self, data: &Data) -> Option<Primitive> {
+        prim_types()
+            .rev()
+            .filter_map(|ty| self.implicit(&data, ty))
+            .filter_map(|ins| ins.try_primitive())
+            .next()
     }
 
     /// Erases the lifetime of the Scope reference internally since
@@ -394,20 +417,9 @@ impl Environment {
         self
     }
 
-    /// Try to solve a .
+    /// Try to implictly get a type.
     pub fn implicit(&self, ty: &str) -> Option<Instance> {
         Lexicon::new(&self.scope).implicit(&self.data, ty)
-    }
-
-    /// Try and implicitly convert this `Data` to a primitive.
-    fn try_primitive(&self, lex: &Lexicon) -> Option<Primitive> {
-        // Inherit the `Environment` scope.
-        let lex = lex.with(&self.scope);
-        prim_types()
-            .rev()
-            .filter_map(|ty| lex.implicit(&self.data, ty))
-            .filter_map(|ins| ins.try_primitive())
-            .next()
     }
 }
 
