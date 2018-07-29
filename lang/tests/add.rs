@@ -3,7 +3,7 @@ extern crate typeflow_engine as tf;
 extern crate typeflow_lang as tfl;
 
 use combine::Parser;
-use tf::{env, f};
+use tf::{env, f, s};
 
 fn parse(s: &str) -> tf::Environment {
     tfl::exps()
@@ -30,4 +30,10 @@ fn add_newtype() {
 fn add_newtype_prim_upcast() {
     let env = parse("a i, b u, +(@0(a(2)), @1(b(3)))");
     assert_eq!(env.implicit("f"), Some(f(5.0)));
+}
+
+#[test]
+fn add_strings() {
+    let env = parse("+(@0(\"hello\"), @1(\" world\"))");
+    assert_eq!(env.implicit("s"), Some(s("hello world")));
 }

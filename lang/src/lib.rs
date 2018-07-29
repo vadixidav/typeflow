@@ -2,13 +2,13 @@
 extern crate combine;
 extern crate typeflow_engine as tf;
 
-use combine::char::{char, digit, space, spaces};
+use combine::char::{char, digit, spaces};
 use combine::combinator::recognize;
 use combine::error::StreamError;
 use combine::stream::StreamErrorFor;
 use combine::{
-    any, between, many1, none_of, optional, sep_by, skip_many, skip_many1, token, value,
-    ParseError, Parser, Stream,
+    between, many1, none_of, optional, sep_by, skip_many, skip_many1, token, value, ParseError,
+    Parser, Stream,
 };
 
 const RESERVED_TOKENS: &str = " ,()";
@@ -20,7 +20,9 @@ where
 {
     let ltoken = || many1(none_of(RESERVED_TOKENS.chars())).skip(spaces());
     let lchar = |c| char(c).skip(spaces());
-    let string = || between(token('"'), token('"'), many1(any())).map(|s: String| tf::S(s.into()));
+    let string = || {
+        between(token('"'), token('"'), many1(none_of(Some('"')))).map(|s: String| tf::S(s.into()))
+    };
     let float = || {
         recognize((
             skip_many1(digit()),
