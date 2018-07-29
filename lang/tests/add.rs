@@ -5,15 +5,24 @@ extern crate typeflow_lang as tfl;
 use combine::Parser;
 use tf::{env, f};
 
-fn parse(s: &str) -> tf::Expression {
-    tfl::exp()
+fn parse(s: &str) -> tf::Environment {
+    tfl::exps()
         .easy_parse(s)
         .unwrap_or_else(|e| panic!("{}", e))
         .0
+        .into_iter()
+        .inspect(|e| println!("{:?}", e))
+        .fold(env(), |en, ex| en.run(ex))
 }
 
 #[test]
 fn add() {
-    let env = env().run(parse("+(@0(2), @1(3))"));
+    let env = parse("+(@0(2), @1(3))");
+    assert_eq!(env.implicit("f"), Some(f(5.0)));
+}
+
+#[test]
+fn add_newtype() {
+    let env = parse("a u, b u, +(@0(a(2)), @1(b(3)))");
     assert_eq!(env.implicit("f"), Some(f(5.0)));
 }

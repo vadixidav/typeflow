@@ -68,7 +68,7 @@ where
         .or(ltoken().then(move |t: String| {
             let t2 = t.clone();
             let t3 = t.clone();
-            between(lchar('('), lchar(')'), sep_by(exp(), lchar(',')))
+            between(lchar('('), lchar(')'), exps())
                 .map(move |e: Vec<tf::Expression>| tf::exp(&t, e))
                 .or(many1(param()).map(move |p: Vec<tf::Parameter>| tf::d(&t2, p)))
                 .or(value(tf::Parameter::Implicit(t3).into()))
@@ -80,5 +80,14 @@ parser!{
     where [I: Stream<Item = char>]
     {
         exp_()
+    }
+}
+
+parser!{
+    pub fn exps[I]()(I) -> Vec<tf::Expression>
+    where [I: Stream<Item = char>]
+    {
+        let lchar = |c| char(c).skip(spaces());
+        sep_by(exp(), lchar(','))
     }
 }
