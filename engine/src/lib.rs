@@ -25,7 +25,7 @@ pub enum Instance {
 
 impl Instance {
     fn is_type(&self, ty: &str) -> bool {
-        ty == self.ty()
+        ty == self.ty() || implict_prim_ty(self.ty(), ty)
     }
 
     fn ty(&self) -> &str {
@@ -38,7 +38,7 @@ impl Instance {
 
     /// Try and extract a type if it is this instance.
     fn extract_self(&self, ty: &str) -> Option<Instance> {
-        (ty == self.ty() || implict_prim_ty(self.ty(), ty)).as_some_from(|| self.clone())
+        self.is_type(ty).as_some_from(|| self.clone())
     }
 
     /// Try and extract a type if it is inside of this instance.
