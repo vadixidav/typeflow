@@ -61,8 +61,8 @@ where
         primitive().or(ltoken().then(move |t: String| {
             let t2 = t.clone();
             between(lchar('('), lchar(')'), sep_by(exp(), lchar(',')))
-                .map(move |e: Vec<tf::Expression>| tf::e(&t, e))
-                .or(value(tf::Parameter::Implicit(t2)))
+                .map(move |e: Vec<tf::Expression>| tf::e(t.clone(), e))
+                .or(value(tf::Parameter::Implicit(t2.into())))
         }))
     };
     primitive()
@@ -71,9 +71,9 @@ where
             let t2 = t.clone();
             let t3 = t.clone();
             between(lchar('('), lchar(')'), exps())
-                .map(move |e: Vec<tf::Expression>| tf::exp(&t, e))
-                .or(many1(param()).map(move |p: Vec<tf::Parameter>| tf::d(&t2, p)))
-                .or(value(tf::Parameter::Implicit(t3).into()))
+                .map(move |e: Vec<tf::Expression>| tf::exp(t2.clone(), e))
+                .or(many1(param()).map(move |p: Vec<tf::Parameter>| tf::d(t3.clone(), p)))
+                .or(value(tf::Parameter::Implicit(t.clone().into()).into()))
         }))
 }
 

@@ -516,10 +516,14 @@ impl Environment {
     }
 }
 
+fn is_builtin_implicit(ty: &str) -> bool {
+    ty.chars().next().map(|c| c == '@').unwrap_or(false)
+}
+
 fn is_builtin_raw(ty: &str) -> bool {
     match ty {
         "+" => true,
-        _ => ty.chars().next().map(|c| c == '@').unwrap_or(false),
+        _ => is_builtin_implicit(ty),
     }
 }
 

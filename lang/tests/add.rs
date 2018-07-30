@@ -11,29 +11,29 @@ fn parse(s: &str) -> tf::Environment {
         .unwrap_or_else(|e| panic!("{}", e))
         .0
         .into_iter()
-        .fold(env(), |en, ex| en.run(ex))
+        .fold(env(), |en, ex| en.run(None, ex))
 }
 
 #[test]
 fn add() {
     let env = parse("+(@0(2), @1(3))");
-    assert_eq!(env.implicit("f"), Some(f(5.0)));
+    assert_eq!(env.implicit(None, "f"), Some(f(5.0)));
 }
 
 #[test]
 fn add_newtype() {
     let env = parse("a u, b u, +(@0(a(2)), @1(b(3)))");
-    assert_eq!(env.implicit("f"), Some(f(5.0)));
+    assert_eq!(env.implicit(None, "f"), Some(f(5.0)));
 }
 
 #[test]
 fn add_newtype_prim_upcast() {
     let env = parse("a i, b u, +(@0(a(2)), @1(b(3)))");
-    assert_eq!(env.implicit("f"), Some(f(5.0)));
+    assert_eq!(env.implicit(None, "f"), Some(f(5.0)));
 }
 
 #[test]
 fn add_strings() {
     let env = parse("+(@0(\"hello\"), @1(\" world\"))");
-    assert_eq!(env.implicit("s"), Some(s("hello world")));
+    assert_eq!(env.implicit(None, "s"), Some(s("hello world")));
 }
