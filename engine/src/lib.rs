@@ -301,12 +301,10 @@ struct Lexicon<'a> {
 }
 
 impl<'a> Lexicon<'a> {
-    fn new<L: Into<Option<slog::Logger>>>(scope: &'a Scope, log: L) -> Self {
+    fn new(scope: &'a Scope, log: slog::Logger) -> Self {
         Lexicon {
             scopes: vec![scope],
-            log: log
-                .into()
-                .unwrap_or_else(|| slog::Logger::root(slog_stdlog::StdLog.fuse(), o!())),
+            log,
         }
     }
 
@@ -320,6 +318,7 @@ impl<'a> Lexicon<'a> {
 
     fn implicit<S: Into<Rc<str>>>(&self, data: &Data, ty: S) -> Option<Instance> {
         let ty = ty.into();
+        trace!(self.log, "implicit {}", ty);
         data.find_type(&ty)
             .or_else(|| {
                 self.iter_definitions()
@@ -438,9 +437,16 @@ impl Environment {
     /// Append an `Expression` to the `Environment`.
     pub fn run<L: Into<Option<slog::Logger>>>(mut self, log: L, e: Expression) -> Self {
         use Expression::*;
+        let log = log
+            .into()
+            .unwrap_or_else(|| slog::Logger::root(slog_stdlog::StdLog.fuse(), o!()));
         match e {
-            Definition(d) => self.scope.def(d),
+            Definition(d) => {
+                trace!(log, "~run definiton");
+                self.scope.def(d)
+            }
             Parameter(p) => {
+                trace!(log, "~run parameter");
                 let res = p.resolve(&Lexicon::new(&self.scope, log), &self.data);
                 self.data.instances.extend(res);
             }
@@ -454,6 +460,11 @@ impl Environment {
         log: L,
         ty: S,
     ) -> Option<Instance> {
+        let log = log
+            .into()
+            .unwrap_or_else(|| slog::Logger::root(slog_stdlog::StdLog.fuse(), o!()));
+        let ty = ty.into();
+        trace!(log, "~implicit: {:?}", ty);
         Lexicon::new(&self.scope, log).implicit(&self.data, ty)
     }
 
