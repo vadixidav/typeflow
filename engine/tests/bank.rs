@@ -39,8 +39,8 @@ fn deposit() {
         e(
             "deposit",
             vec![
-                exp("bank", vec![exp("money", vec![I(3).into()])]),
-                exp("deposit_money", vec![exp("money", vec![I(4).into()])]),
+                exp("bank", vec![exp("m", vec![I(3).into()])]),
+                exp("deposit_amount", vec![exp("m", vec![I(4).into()])]),
             ],
         ).into(),
     );

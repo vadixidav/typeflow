@@ -12,4 +12,5 @@ slog-stdlog = "3.0.2"
 
 [dev-dependencies]
 slog-term = "2.4.0"
-slog = { version = "2.3.2", features = ["max_level_trace"] }
+# Uncomment to see trace output from tests.
+# slog = { version = "2.3.2", features = ["max_level_trace"] }

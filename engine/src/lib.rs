@@ -137,14 +137,16 @@ impl Definition {
     }
 
     /// Checks if a type can be explicitly produced by this definition.
-    fn is_explicit(&self, ty: &str) -> bool {
-        &*self.ltype == ty
+    fn is_explicit(&self, log: &slog::Logger, ty: &str) -> bool {
+        let res = &*self.ltype == ty;
+        trace!(log, "def::is_explicit {}", ty; "success" => res);
+        res
     }
 
     /// Tries to extract a type implicitly using this definition
     fn implicit(&self, lex: &Lexicon, data: &Data, ty: &str) -> Option<Instance> {
         self.is_implicit(ty).and_option_from(|| {
-            trace!(lex.log, "implicit {} -> {}", self.ltype, ty);
+            trace!(lex.log, "def::implicit {} -> {}", self.ltype, ty);
             lex.implicit(data, self.ltype.clone())
                 .and_then(|ins| ins.extract(ty))
         })
@@ -269,9 +271,23 @@ pub struct Explicit {
 
 impl Explicit {
     fn resolve(&self, lex: &Lexicon, data: &Data) -> Option<Instance> {
-        self.args
-            .resolve(lex, data)
-            .and_then(|env| env.explicit(lex, self.target.clone()))
+        trace!(lex.log, "exp::resolve {} {{", self.target);
+        let res = is_builtin_raw(&self.target)
+            .and_option_from(|| {
+                self.args.resolve(lex, data).map(|env| {
+                    Compound {
+                        ty: self.target.clone(),
+                        env,
+                    }.into()
+                })
+            })
+            .or_else(|| {
+                self.args
+                    .resolve(lex, data)
+                    .and_then(|env| env.explicit(lex, self.target.clone()))
+            });
+        trace!(lex.log, "}}"; "success" => res.is_some());
+        res
     }
 }
 
@@ -318,14 +334,17 @@ impl<'a> Lexicon<'a> {
 
     fn implicit<S: Into<Rc<str>>>(&self, data: &Data, ty: S) -> Option<Instance> {
         let ty = ty.into();
-        trace!(self.log, "implicit {}", ty);
-        data.find_type(&ty)
+        trace!(self.log, "lex::implicit {} {{", ty);
+        let res = data
+            .find_type(&ty)
             .or_else(|| {
                 self.iter_definitions()
                     .filter_map(|d| d.implicit(self, data, &ty))
                     .next()
             })
-            .or_else(|| self.try_builtin(data, &ty))
+            .or_else(|| self.try_builtin(data, &ty));
+        trace!(self.log, "}}"; "success" => res.is_some());
+        res
     }
 
     /// Try to use built-in implicit conversions.
@@ -472,9 +491,10 @@ impl Environment {
     fn explicit<S: Into<Rc<str>>>(&self, lex: &Lexicon, ty: S) -> Option<Instance> {
         let lex = lex.with(&self.scope);
         let ty = ty.into();
+        trace!(lex.log, "env::explicit {} {{", ty);
         let res = lex
             .iter_definitions()
-            .filter(|d| d.is_explicit(&ty))
+            .filter(|d| d.is_explicit(&lex.log, &ty))
             .filter_map(|d| {
                 d.params
                     .iter()
@@ -491,7 +511,15 @@ impl Environment {
                     })
             })
             .next();
+        trace!(lex.log, "}}"; "success" => res.is_some());
         res
+    }
+}
+
+fn is_builtin_raw(ty: &str) -> bool {
+    match ty {
+        "+" => true,
+        _ => ty.chars().next().map(|c| c == '@').unwrap_or(false),
     }
 }
 
