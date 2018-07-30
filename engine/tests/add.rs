@@ -1,21 +1,29 @@
+#[macro_use]
+extern crate slog;
 extern crate typeflow_engine as tf;
+
+mod logger;
+use logger::*;
 
 use tf::{d, e, env, exp, f, imp, oe, I, U};
 
 #[test]
 fn add_upcasting() {
+    let log = logger();
     // +(2,3)
-    let env = env().run(exp("+", vec![oe(0, I(2)), oe(1, U(3))]));
-    assert_eq!(env.implicit("f"), Some(f(5.0)));
+    let env = env().run(log.clone(), exp("+", vec![oe(0, I(2)), oe(1, U(3))]));
+    assert_eq!(env.implicit(log.clone(), "f"), Some(f(5.0)));
 }
 
 #[test]
 fn add_newtype() {
+    let log = logger();
     // a i, b u, +(a(2),b(3))
     let env = env()
-        .run(d("a", vec![imp("i")]))
-        .run(d("b", vec![imp("u")]))
+        .run(log.clone(), d("a", vec![imp("i")]))
+        .run(log.clone(), d("b", vec![imp("u")]))
         .run(
+            log.clone(),
             e(
                 "+",
                 vec![
@@ -25,13 +33,15 @@ fn add_newtype() {
             ).into(),
         );
 
-    assert_eq!(env.implicit("f"), Some(f(5.0)));
+    assert_eq!(env.implicit(log.clone(), "f"), Some(f(5.0)));
 }
 
 #[test]
 fn add_newtype_nodef() {
+    let log = logger();
     // a i, +(a(2),b(3))
-    let env = env().run(d("a", vec![imp("i")])).run(
+    let env = env().run(log.clone(), d("a", vec![imp("i")])).run(
+        log.clone(),
         e(
             "+",
             vec![
@@ -44,5 +54,5 @@ fn add_newtype_nodef() {
     // FIXME: This currently gives back `2.0` but it should give back nothing.
     // It should give back nothing because `@1` exists but can't be converted to a primitive.
     // It currently stops at `@1` and returns the result, but it should fail the operation instead.
-    assert_eq!(env.implicit("f"), None);
+    assert_eq!(env.implicit(log.clone(), "f"), None);
 }

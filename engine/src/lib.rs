@@ -1,6 +1,9 @@
 extern crate boolinator;
 extern crate either;
 extern crate itertools;
+#[macro_use]
+extern crate slog;
+extern crate slog_stdlog;
 
 mod primitive;
 pub use primitive::*;
@@ -8,6 +11,7 @@ pub use primitive::*;
 use boolinator::Boolinator;
 use either::Either;
 use itertools::Itertools;
+use slog::Drain;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
@@ -140,6 +144,7 @@ impl Definition {
     /// Tries to extract a type implicitly using this definition
     fn implicit(&self, lex: &Lexicon, data: &Data, ty: &str) -> Option<Instance> {
         self.is_implicit(ty).and_option_from(|| {
+            trace!(lex.log, "implicit {} -> {}", self.ltype, ty);
             lex.implicit(data, self.ltype.clone())
                 .and_then(|ins| ins.extract(ty))
         })
@@ -289,15 +294,19 @@ impl From<Vec<Definition>> for Scope {
 }
 
 /// A lexicon contains all the definitions known in a given context.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 struct Lexicon<'a> {
     scopes: Vec<&'a Scope>,
+    log: slog::Logger,
 }
 
 impl<'a> Lexicon<'a> {
-    fn new(scope: &'a Scope) -> Self {
+    fn new<L: Into<Option<slog::Logger>>>(scope: &'a Scope, log: L) -> Self {
         Lexicon {
             scopes: vec![scope],
+            log: log
+                .into()
+                .unwrap_or_else(|| slog::Logger::root(slog_stdlog::StdLog.fuse(), o!())),
         }
     }
 
@@ -427,12 +436,12 @@ pub struct Environment {
 
 impl Environment {
     /// Append an `Expression` to the `Environment`.
-    pub fn run(mut self, e: Expression) -> Self {
+    pub fn run<L: Into<Option<slog::Logger>>>(mut self, log: L, e: Expression) -> Self {
         use Expression::*;
         match e {
             Definition(d) => self.scope.def(d),
             Parameter(p) => {
-                let res = p.resolve(&Lexicon::new(&self.scope), &self.data);
+                let res = p.resolve(&Lexicon::new(&self.scope, log), &self.data);
                 self.data.instances.extend(res);
             }
         }
@@ -440,8 +449,12 @@ impl Environment {
     }
 
     /// Try to implictly get a type.
-    pub fn implicit<S: Into<Rc<str>>>(&self, ty: S) -> Option<Instance> {
-        Lexicon::new(&self.scope).implicit(&self.data, ty)
+    pub fn implicit<S: Into<Rc<str>>, L: Into<Option<slog::Logger>>>(
+        &self,
+        log: L,
+        ty: S,
+    ) -> Option<Instance> {
+        Lexicon::new(&self.scope, log).implicit(&self.data, ty)
     }
 
     /// Use this environment to try and explicitly resolve a definition for a type.
