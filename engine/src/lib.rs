@@ -516,6 +516,19 @@ impl Environment {
     }
 }
 
+impl fmt::Display for Environment {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let nins = self.data.instances.len();
+        if nins != 0 {
+            for i in 0..nins - 1 {
+                write!(f, "{} ", self.data.instances[i])?;
+            }
+            write!(f, "{}", self.data.instances[nins - 1])?;
+        }
+        Ok(())
+    }
+}
+
 fn is_builtin_implicit(ty: &str) -> bool {
     ty.chars().next().map(|c| c == '@').unwrap_or(false)
 }
