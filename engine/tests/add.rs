@@ -51,8 +51,5 @@ fn add_newtype_nodef() {
         ).into(),
     );
 
-    // FIXME: This currently gives back `2.0` but it should give back nothing.
-    // It should give back nothing because `@1` exists but can't be converted to a primitive.
-    // It currently stops at `@1` and returns the result, but it should fail the operation instead.
     assert_eq!(env.implicit(log.clone(), "f"), None);
 }
