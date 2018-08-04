@@ -123,22 +123,22 @@ impl fmt::Display for Compound {
     }
 }
 
-/// A definition is `ltype = params`.
+/// A definition is `target = params`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Definition {
-    pub ltype: Rc<str>,
+    pub target: Rc<str>,
     pub params: Vec<Parameter>,
 }
 
 impl Definition {
-    /// Checks if a type can be implicitly produced from the `ltype` of this `Definition`.
+    /// Checks if a type can be implicitly produced from the `target` of this `Definition`.
     fn is_implicit(&self, ty: &str) -> bool {
         self.produces().any(|s| s == ty || implict_prim_ty(s, ty))
     }
 
     /// Checks if a type can be explicitly produced by this definition.
     fn is_explicit(&self, log: &slog::Logger, ty: &str) -> bool {
-        let res = &*self.ltype == ty;
+        let res = &*self.target == ty;
         trace!(log, "def::is_explicit {}", ty; "success" => res);
         res
     }
@@ -146,8 +146,8 @@ impl Definition {
     /// Tries to extract a type implicitly using this definition
     fn implicit(&self, lex: &Lexicon, data: &Data, ty: &str) -> Option<Instance> {
         self.is_implicit(ty).and_option_from(|| {
-            trace!(lex.log, "def::implicit {} -> {}", self.ltype, ty);
-            lex.implicit(data, self.ltype.clone())
+            trace!(lex.log, "def::implicit {} -> {}", self.target, ty);
+            lex.implicit(data, self.target.clone())
                 .and_then(|ins| ins.extract(ty))
         })
     }
@@ -576,7 +576,7 @@ pub fn exp<S: Into<Rc<str>>>(target: S, exprs: Vec<Expression>) -> Expression {
 
 pub fn d<S: Into<Rc<str>>>(ltype: S, params: Vec<Parameter>) -> Expression {
     Definition {
-        ltype: ltype.into(),
+        target: ltype.into(),
         params,
     }.into()
 }
