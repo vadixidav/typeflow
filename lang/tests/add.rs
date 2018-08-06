@@ -21,6 +21,12 @@ fn add() {
 }
 
 #[test]
+fn add_infix() {
+    let env = parse("2 + 3");
+    assert_eq!(env.implicit(None, "f"), Some(f(5.0)));
+}
+
+#[test]
 fn add_newtype() {
     let env = parse("a u, b u, +(@0(a(2)), @1(b(3)))");
     assert_eq!(env.implicit(None, "f"), Some(f(5.0)));

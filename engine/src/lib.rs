@@ -176,8 +176,7 @@ impl Arguments {
                     None
                 }
                 Expression::Parameter(p) => Some(p),
-            })
-            .map(|p| p.resolve(lex, &data))
+            }).map(|p| p.resolve(lex, &data))
             .collect::<Option<Vec<Instance>>>()
             .map(|v| Environment {
                 data: v.into(),
@@ -234,8 +233,7 @@ impl Parameter {
                             ..Default::default()
                         },
                     }.into()
-                })
-                .or_else(|| lex.implicit(data, ty.clone())),
+                }).or_else(|| lex.implicit(data, ty.clone())),
             Literal(p) => Some(Instance::Primitive(p.clone())),
         }
     }
@@ -280,8 +278,7 @@ impl Explicit {
                         env,
                     }.into()
                 })
-            })
-            .or_else(|| {
+            }).or_else(|| {
                 self.args
                     .resolve(lex, data)
                     .and_then(|env| env.explicit(lex, self.target.clone()))
@@ -341,8 +338,7 @@ impl<'a> Lexicon<'a> {
                 self.iter_definitions()
                     .filter_map(|d| d.implicit(self, data, &ty))
                     .next()
-            })
-            .or_else(|| self.try_builtin(data, &ty));
+            }).or_else(|| self.try_builtin(data, &ty));
         trace!(self.log, "}}"; "success" => res.is_some());
         res
     }
@@ -433,8 +429,7 @@ impl Data {
             .flat_map(|ins| match ins {
                 Instance::Compound(c) if &*c.ty == "!" => Either::Left(c.env.data.instances.iter()),
                 ins => Either::Right(once(ins)),
-            })
-            .find(|ins| ins.is_type(ty))
+            }).find(|ins| ins.is_type(ty))
             .cloned()
     }
 }
@@ -509,8 +504,7 @@ impl Environment {
                             },
                         }.into()
                     })
-            })
-            .next();
+            }).next();
         trace!(lex.log, "}}"; "success" => res.is_some());
         res
     }
@@ -556,6 +550,20 @@ pub fn oe<P: Into<Parameter>>(n: usize, param: P) -> Expression {
                 exprs: vec![Expression::Parameter(param.into())],
             },
         }.into(),
+    )
+}
+
+pub fn ops<S: Into<Rc<str>>, I: IntoIterator<Item = Parameter>>(
+    target: S,
+    params: I,
+) -> Expression {
+    exp(
+        target,
+        params
+            .into_iter()
+            .enumerate()
+            .map(|(ix, p)| oe(ix, p))
+            .collect(),
     )
 }
 
