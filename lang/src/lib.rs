@@ -24,11 +24,7 @@ where
         .map(tf::Parameter::Literal)
         .or(ltoken().then(move |t: String| {
             let t: Rc<str> = t.into();
-            between(lchar('('), lchar(')'), sep_by(exp(), lchar(',')))
-                .map({
-                    let t = t.clone();
-                    move |e: Vec<tf::Expression>| tf::e(t.clone(), e)
-                }).or(value(tf::Parameter::Implicit(t)))
+            explicit(t.clone()).or(value(tf::Parameter::Implicit(t)))
         }))
 }
 
@@ -42,21 +38,12 @@ where
         .or(ltoken().then(move |t: String| {
             let t: Rc<str> = t.into();
             explicit(t.clone())
+                .map(tf::Expression::Parameter)
                 .or(many1(param()).map({
                     let t = t.clone();
                     move |p: Vec<tf::Parameter>| tf::d(t.clone(), p)
                 })).or(value(tf::Parameter::Implicit(t).into()))
         }))
-}
-
-fn explicit<I, S: Into<Rc<str>>>(target: S) -> impl Parser<Input = I, Output = tf::Expression>
-where
-    I: Stream<Item = char>,
-    I::Error: ParseError<I::Item, I::Range, I::Position>,
-{
-    let target = target.into();
-    between(lchar('('), lchar(')'), exps())
-        .map(move |e: Vec<tf::Expression>| tf::exp(target.clone(), e))
 }
 
 fn primitive<I>() -> impl Parser<Input = I, Output = tf::Primitive>
@@ -108,6 +95,16 @@ where
     I::Error: ParseError<I::Item, I::Range, I::Position>,
 {
     many1(none_of(RESERVED_TOKENS.chars())).skip(spaces())
+}
+
+fn explicit<I, S: Into<Rc<str>>>(target: S) -> impl Parser<Input = I, Output = tf::Parameter>
+where
+    I: Stream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    let target = target.into();
+    between(lchar('('), lchar(')'), exps())
+        .map(move |e: Vec<tf::Expression>| tf::e(target.clone(), e))
 }
 
 parser!{
