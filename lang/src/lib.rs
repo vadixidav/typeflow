@@ -79,7 +79,7 @@ where
                     .map_err(|_| StreamErrorFor::<I>::expected_static_message("unsigned int"))
             }).map(tf::U)
     };
-    uint().or(int()).or(float()).or(string())
+    uint().or(int()).or(float()).or(string()).skip(spaces())
 }
 
 fn lchar<I>(c: char) -> impl Parser<Input = I, Output = char>
@@ -113,7 +113,8 @@ where
     I: Stream<Item = char>,
     I::Error: ParseError<I::Item, I::Range, I::Position>,
 {
-    sep_by(param_(), lchar('+')).and_then(|params: Vec<tf::Parameter>| {
+    sep_by(param(), lchar('+')).and_then(|params: Vec<tf::Parameter>| {
+        println!("see param len {}", params.len());
         if params.len() >= 2 {
             Ok(tf::ops("+", params))
         } else {
@@ -141,10 +142,23 @@ parser!{
     }
 }
 
-parser!{
-    fn param_[I]()(I) -> tf::Parameter
-    where [I: Stream<Item = char>]
-    {
-        param()
-    }
+#[cfg(test)]
+fn parse(s: &str) -> tf::Environment {
+    exps()
+        .easy_parse(s)
+        .unwrap_or_else(|e| panic!("{}", e))
+        .0
+        .into_iter()
+        .fold(tf::env(), |en, ex| {
+            println!("{:?}", ex);
+            en.run(None, ex)
+        })
+}
+
+#[cfg(test)]
+#[test]
+fn add_infix() {
+    add()
+        .easy_parse("2 + 3")
+        .unwrap_or_else(|e| panic!("{}", e));
 }
