@@ -114,7 +114,6 @@ where
     I::Error: ParseError<I::Item, I::Range, I::Position>,
 {
     sep_by(param(), lchar('+')).and_then(|params: Vec<tf::Parameter>| {
-        println!("see param len {}", params.len());
         if params.len() >= 2 {
             Ok(tf::ops("+", params))
         } else {
