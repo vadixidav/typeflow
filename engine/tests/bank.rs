@@ -5,7 +5,7 @@ extern crate typeflow_engine as tf;
 mod logger;
 use logger::*;
 
-use tf::{d, e, env, exp, i, imp, oe, Environment, I};
+use tf::{d, e, env, exp, imp, oe, Environment, I};
 
 fn bank(log: &Logger, env: Environment) -> Environment {
     env.run(log.clone(), d("m", vec![imp("i")]))
@@ -45,5 +45,5 @@ fn deposit() {
         ).into(),
     );
 
-    assert_eq!(env.implicit(log.clone(), "i"), Some(i(7)));
+    assert_eq!(env.implicit(log.clone(), "i"), Some(I(7).into()));
 }

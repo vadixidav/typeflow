@@ -2,7 +2,7 @@ use std::ops::*;
 use std::rc::Rc;
 
 use std::fmt;
-use Instance;
+use Parameter;
 
 pub use Primitive::*;
 
@@ -86,19 +86,19 @@ pub fn is_prim_type(ty: &str) -> bool {
     prim_types().any(|s| s == ty)
 }
 
-pub fn s<S: Into<Rc<str>>>(s: S) -> Instance {
+pub fn s<S: Into<Rc<str>>>(s: S) -> Parameter {
     S(s.into()).into()
 }
 
-pub fn f(f: f64) -> Instance {
+pub fn f(f: f64) -> Parameter {
     F(f).into()
 }
 
-pub fn i(i: i64) -> Instance {
+pub fn i(i: i64) -> Parameter {
     I(i).into()
 }
 
-pub fn u(u: u64) -> Instance {
+pub fn u(u: u64) -> Parameter {
     U(u).into()
 }
 

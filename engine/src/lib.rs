@@ -553,11 +553,8 @@ pub fn oe<P: Into<Parameter>>(n: usize, param: P) -> Expression {
     )
 }
 
-pub fn ops<S: Into<Rc<str>>, I: IntoIterator<Item = Parameter>>(
-    target: S,
-    params: I,
-) -> Expression {
-    exp(
+pub fn ops<S: Into<Rc<str>>, I: IntoIterator<Item = Parameter>>(target: S, params: I) -> Parameter {
+    e(
         target,
         params
             .into_iter()
@@ -565,6 +562,13 @@ pub fn ops<S: Into<Rc<str>>, I: IntoIterator<Item = Parameter>>(
             .map(|(ix, p)| oe(ix, p))
             .collect(),
     )
+}
+
+pub fn oxp<S: Into<Rc<str>>, I: IntoIterator<Item = Parameter>>(
+    target: S,
+    params: I,
+) -> Expression {
+    ops(target, params).into()
 }
 
 pub fn env() -> Environment {

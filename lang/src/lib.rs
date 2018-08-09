@@ -15,7 +15,7 @@ use std::rc::Rc;
 
 const RESERVED_TOKENS: &str = " ,()";
 
-fn param_<I>() -> impl Parser<Input = I, Output = tf::Parameter>
+fn param<I>() -> impl Parser<Input = I, Output = tf::Parameter>
 where
     I: Stream<Item = char>,
     I::Error: ParseError<I::Item, I::Range, I::Position>,
@@ -28,13 +28,14 @@ where
         }))
 }
 
-fn exp_<I>() -> impl Parser<Input = I, Output = tf::Expression>
+fn exp<I>() -> impl Parser<Input = I, Output = tf::Expression>
 where
     I: Stream<Item = char>,
     I::Error: ParseError<I::Item, I::Range, I::Position>,
 {
-    primitive()
-        .map(|p| p.into())
+    combine::try(add())
+        .map(tf::Expression::Parameter)
+        .or(primitive().map(|p| p.into()))
         .or(ltoken().then(move |t: String| {
             let t: Rc<str> = t.into();
             explicit(t.clone())
@@ -107,27 +108,43 @@ where
         .map(move |e: Vec<tf::Expression>| tf::e(target.clone(), e))
 }
 
+fn add<I>() -> impl Parser<Input = I, Output = tf::Parameter>
+where
+    I: Stream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    sep_by(param_(), lchar('+')).and_then(|params: Vec<tf::Parameter>| {
+        if params.len() >= 2 {
+            Ok(tf::ops("+", params))
+        } else {
+            Err(StreamErrorFor::<I>::expected_static_message(
+                "add expression",
+            ))
+        }
+    })
+}
+
+pub fn exps<I>() -> impl Parser<Input = I, Output = Vec<tf::Expression>>
+where
+    I: Stream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    let lchar = |c| char(c).skip(spaces());
+    sep_by(exp_(), lchar(','))
+}
+
 parser!{
-    pub fn exp[I]()(I) -> tf::Expression
+    fn exp_[I]()(I) -> tf::Expression
     where [I: Stream<Item = char>]
     {
-        exp_()
+        exp()
     }
 }
 
 parser!{
-    pub fn exps[I]()(I) -> Vec<tf::Expression>
+    fn param_[I]()(I) -> tf::Parameter
     where [I: Stream<Item = char>]
     {
-        let lchar = |c| char(c).skip(spaces());
-        sep_by(exp(), lchar(','))
-    }
-}
-
-parser!{
-    pub fn param[I]()(I) -> tf::Parameter
-    where [I: Stream<Item = char>]
-    {
-        param_()
+        param()
     }
 }
