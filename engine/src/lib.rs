@@ -116,7 +116,7 @@ impl fmt::Display for Compound {
     }
 }
 
-/// A definition is `target = params`.
+/// A definition is `target params`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Definition {
     pub target: Rc<str>,
@@ -152,6 +152,8 @@ impl Definition {
 }
 
 /// Arguments is a series of expressions that produce an output Data.
+/// 
+/// The arguments have inputs and may produce several outputs.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments {
     pub exprs: Vec<Expression>,
@@ -403,7 +405,7 @@ impl<'a> Drop for ScopedLex<'a> {
     }
 }
 
-/// An Data contains all of the instances available.
+/// A `Data` contains all of the instances available.
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Data {
     instances: Vec<Instance>,
