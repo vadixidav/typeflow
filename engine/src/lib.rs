@@ -1,19 +1,12 @@
-extern crate boolinator;
-extern crate either;
-extern crate itertools;
-#[macro_use]
-extern crate slog;
-extern crate slog_stdlog;
-
 mod primitive;
 pub use primitive::*;
 
 use boolinator::Boolinator;
 use either::Either;
 use itertools::Itertools;
-use slog::Drain;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
+use log::*;
 
 use std::fmt;
 
@@ -137,16 +130,16 @@ impl Definition {
     }
 
     /// Checks if a type can be explicitly produced by this definition.
-    fn is_explicit(&self, log: &slog::Logger, ty: &str) -> bool {
+    fn is_explicit(&self, ty: &str) -> bool {
         let res = &*self.target == ty;
-        trace!(log, "def::is_explicit {}", ty; "success" => res);
+        trace!("def::is_explicit {} -> {}", ty, res);
         res
     }
 
     /// Tries to extract a type implicitly using this definition
     fn implicit(&self, lex: &Lexicon, data: &Data, ty: &str) -> Option<Instance> {
         self.is_implicit(ty).and_option_from(|| {
-            trace!(lex.log, "def::implicit {} -> {}", self.target, ty);
+            trace!("def::implicit {} -> {}", self.target, ty);
             lex.implicit(data, self.target.clone())
                 .and_then(|ins| ins.extract(ty))
         })
@@ -269,7 +262,7 @@ pub struct Explicit {
 
 impl Explicit {
     fn resolve(&self, lex: &Lexicon, data: &Data) -> Option<Instance> {
-        trace!(lex.log, "exp::resolve {} {{", self.target);
+        trace!("exp::resolve {} {{", self.target);
         let res = is_builtin_raw(&self.target)
             .and_option_from(|| {
                 self.args.resolve(lex, data).map(|env| {
@@ -283,7 +276,7 @@ impl Explicit {
                     .resolve(lex, data)
                     .and_then(|env| env.explicit(lex, self.target.clone()))
             });
-        trace!(lex.log, "}}"; "success" => res.is_some());
+        trace!("}} -> {}", res.is_some());
         res
     }
 }
@@ -310,14 +303,12 @@ impl From<Vec<Definition>> for Scope {
 #[derive(Clone, Debug)]
 struct Lexicon<'a> {
     scopes: Vec<&'a Scope>,
-    log: slog::Logger,
 }
 
 impl<'a> Lexicon<'a> {
-    fn new(scope: &'a Scope, log: slog::Logger) -> Self {
+    fn new(scope: &'a Scope) -> Self {
         Lexicon {
             scopes: vec![scope],
-            log,
         }
     }
 
@@ -331,7 +322,7 @@ impl<'a> Lexicon<'a> {
 
     fn implicit<S: Into<Rc<str>>>(&self, data: &Data, ty: S) -> Option<Instance> {
         let ty = ty.into();
-        trace!(self.log, "lex::implicit {} {{", ty);
+        trace!("lex::implicit {} {{", ty);
         let res = data
             .find_type(&ty)
             .or_else(|| {
@@ -339,7 +330,7 @@ impl<'a> Lexicon<'a> {
                     .filter_map(|d| d.implicit(self, data, &ty))
                     .next()
             }).or_else(|| self.try_builtin(data, &ty));
-        trace!(self.log, "}}"; "success" => res.is_some());
+        trace!("}} -> {}", res.is_some());
         res
     }
 
@@ -449,19 +440,16 @@ pub struct Environment {
 
 impl Environment {
     /// Append an `Expression` to the `Environment`.
-    pub fn run<L: Into<Option<slog::Logger>>>(mut self, log: L, e: Expression) -> Self {
+    pub fn run(mut self, e: Expression) -> Self {
         use Expression::*;
-        let log = log
-            .into()
-            .unwrap_or_else(|| slog::Logger::root(slog_stdlog::StdLog.fuse(), o!()));
         match e {
             Definition(d) => {
-                trace!(log, "~run definiton");
+                trace!("~run definiton");
                 self.scope.def(d)
             }
             Parameter(p) => {
-                trace!(log, "~run parameter");
-                let res = p.resolve(&Lexicon::new(&self.scope, log), &self.data);
+                trace!("~run parameter");
+                let res = p.resolve(&Lexicon::new(&self.scope), &self.data);
                 self.data.instances.extend(res);
             }
         }
@@ -469,27 +457,23 @@ impl Environment {
     }
 
     /// Try to implictly get a type.
-    pub fn implicit<S: Into<Rc<str>>, L: Into<Option<slog::Logger>>>(
+    pub fn implicit<S: Into<Rc<str>>>(
         &self,
-        log: L,
         ty: S,
     ) -> Option<Instance> {
-        let log = log
-            .into()
-            .unwrap_or_else(|| slog::Logger::root(slog_stdlog::StdLog.fuse(), o!()));
         let ty = ty.into();
-        trace!(log, "~implicit: {:?}", ty);
-        Lexicon::new(&self.scope, log).implicit(&self.data, ty)
+        trace!("~implicit: {:?}", ty);
+        Lexicon::new(&self.scope).implicit(&self.data, ty)
     }
 
     /// Use this environment to try and explicitly resolve a definition for a type.
     fn explicit<S: Into<Rc<str>>>(&self, lex: &Lexicon, ty: S) -> Option<Instance> {
         let lex = lex.with(&self.scope);
         let ty = ty.into();
-        trace!(lex.log, "env::explicit {} {{", ty);
+        trace!("env::explicit {} {{", ty);
         let res = lex
             .iter_definitions()
-            .filter(|d| d.is_explicit(&lex.log, &ty))
+            .filter(|d| d.is_explicit(&ty))
             .filter_map(|d| {
                 d.params
                     .iter()
@@ -505,7 +489,7 @@ impl Environment {
                         }.into()
                     })
             }).next();
-        trace!(lex.log, "}}"; "success" => res.is_some());
+        trace!("}} -> {}", res.is_some());
         res
     }
 }

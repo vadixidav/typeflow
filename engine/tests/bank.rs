@@ -1,18 +1,13 @@
-#[macro_use]
-extern crate slog;
-extern crate typeflow_engine as tf;
-
 mod logger;
-use logger::*;
 
 use tf::{d, e, env, exp, imp, oe, Environment, I};
 
-fn bank(log: &Logger, env: Environment) -> Environment {
-    env.run(log.clone(), d("m", vec![imp("i")]))
-        .run(log.clone(), d("bank", vec![imp("m")]))
-        .run(log.clone(), d("deposit_amount", vec![imp("m")]))
+fn bank(env: Environment) -> Environment {
+    logger::log();
+    env.run(d("m", vec![imp("i")]))
+        .run(d("bank", vec![imp("m")]))
+        .run(d("deposit_amount", vec![imp("m")]))
         .run(
-            log.clone(),
             d(
                 "deposit",
                 vec![e(
@@ -31,11 +26,10 @@ fn bank(log: &Logger, env: Environment) -> Environment {
 
 #[test]
 fn deposit() {
-    let log = logger();
+    logger::log();
 
     // a i, b u, +(a(2),b(3))
-    let env = bank(&log, env()).run(
-        log.clone(),
+    let env = bank(env()).run(
         e(
             "deposit",
             vec![
@@ -45,5 +39,5 @@ fn deposit() {
         ).into(),
     );
 
-    assert_eq!(env.implicit(log.clone(), "i"), Some(I(7).into()));
+    assert_eq!(env.implicit("i"), Some(I(7).into()));
 }

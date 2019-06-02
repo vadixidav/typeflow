@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate combine;
-extern crate typeflow_engine as tf;
 
 use combine::char::{char, digit, spaces};
 use combine::combinator::recognize;

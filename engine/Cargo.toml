@@ -1,17 +1,17 @@
 [package]
-name = "typeflow-engine"
+name = "tf-engine"
 version = "0.1.0"
 authors = ["Geordon Worley <vadixidav@gmail.com>"]
 edition = "2018"
+
+[lib]
+name = "tf"
 
 [dependencies]
 boolinator = "2.4.0"
 itertools = "0.7.8"
 either = "1.5.0"
-slog = "2.3.2"
-slog-stdlog = "3.0.2"
+log = "0.4.6"
 
 [dev-dependencies]
-slog-term = "2.4.0"
-# Uncomment to see trace output from tests.
-# slog = { version = "2.3.2", features = ["max_level_trace"] }
+env_logger = "0.6.1"

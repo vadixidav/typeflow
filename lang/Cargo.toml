@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Geordon Worley <vadixidav@gmail.com>"]
 edition = "2018"
 
+[lib]
+name = "tfl"
+
 [dependencies]
 combine = "3.8.1"
-typeflow-engine = { path = "../engine" }
+tf-engine = { path = "../engine" }
