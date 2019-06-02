@@ -2,7 +2,8 @@
 name = "typeflow-lang"
 version = "0.1.0"
 authors = ["Geordon Worley <vadixidav@gmail.com>"]
+edition = "2018"
 
 [dependencies]
-combine = "3.3.6"
+combine = "3.8.1"
 typeflow-engine = { path = "../engine" }

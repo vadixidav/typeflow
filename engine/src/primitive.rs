@@ -2,7 +2,7 @@ use std::ops::*;
 use std::rc::Rc;
 
 use std::fmt;
-use Parameter;
+use crate::Parameter;
 
 pub use Primitive::*;
 

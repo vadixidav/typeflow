@@ -33,7 +33,7 @@ where
     I: Stream<Item = char>,
     I::Error: ParseError<I::Item, I::Range, I::Position>,
 {
-    combine::try(add())
+    combine::attempt(add())
         .map(tf::Expression::Parameter)
         .or(primitive().map(|p| p.into()))
         .or(ltoken().then(move |t: String| {
@@ -139,19 +139,6 @@ parser!{
     {
         exp()
     }
-}
-
-#[cfg(test)]
-fn parse(s: &str) -> tf::Environment {
-    exps()
-        .easy_parse(s)
-        .unwrap_or_else(|e| panic!("{}", e))
-        .0
-        .into_iter()
-        .fold(tf::env(), |en, ex| {
-            println!("{:?}", ex);
-            en.run(None, ex)
-        })
 }
 
 #[cfg(test)]
